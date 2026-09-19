@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { errorMessage, get, post } from '../../lib/api';
+import { errorMessage, get, post, put } from '../../lib/api';
 import { useToast } from '../../components/Toast';
 import { EmptyState, PageHeader, StatCard } from '../../components/ui';
 import { useAuth } from '../../hooks/useAuth';
@@ -61,6 +61,17 @@ export default function TodayPage() {
     onSuccess: () => {
       toast.show('وضعیت امروز ثبت شد. موفق باشی! 💪');
       void queryClient.invalidateQueries({ queryKey: ['state', today] });
+    },
+    onError: (e) => toast.show(errorMessage(e), 'error'),
+  });
+
+  const togglePlanItem = useMutation({
+    mutationFn: ({ idx, done }: { idx: number; done: boolean }) => {
+        const items = planItems.map((it, i) => (i === idx ? { ...it, done } : it));
+        return put(`/plans/${today}`, { items, status: plan?.data?.status ?? 'active' });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plan', today] });
     },
     onError: (e) => toast.show(errorMessage(e), 'error'),
   });
@@ -177,10 +188,14 @@ export default function TodayPage() {
             <div className="space-y-2">
               {planItems.map((item, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                  <input type="checkbox" className="accent-primary-600 w-4 h-4"
+                         title={item.done ? 'انجام شده' : 'علامت زدن به‌عنوان انجام‌شده'}
+                         checked={!!item.done}
+                         onChange={(e) => togglePlanItem.mutate({ idx: i, done: e.target.checked })} />
                   <span className="text-xs font-bold text-primary-700 tabular-nums" dir="ltr">
                     {toFaDigits(item.start)} – {toFaDigits(item.end)}
                   </span>
-                  <span className="flex-1 text-sm text-slate-700">{item.title}</span>
+                  <span className={`flex-1 text-sm ${item.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{item.title}</span>
                   {item.subject && <span className="chip bg-primary-50 text-primary-700">{item.subject}</span>}
                 </div>
               ))}

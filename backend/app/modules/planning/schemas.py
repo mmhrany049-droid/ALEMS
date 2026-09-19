@@ -6,6 +6,7 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.planning.domain import validate_time_range
 from app.modules.planning.models import BLOCK_TYPES, GOAL_STATUSES, GOAL_TYPES
 
 
@@ -50,6 +51,7 @@ class TimeBlockIn(BaseModel):
     def check(self) -> "TimeBlockIn":
         if self.block_type not in BLOCK_TYPES:
             raise ValueError(f"نوع بلوک نامعتبر است. مقادیر مجاز: {', '.join(BLOCK_TYPES)}")
+        validate_time_range(self.start_time, self.end_time)
         return self
 
 
@@ -64,6 +66,11 @@ class PlanItemIn(BaseModel):
     subject: str | None = None
     type: str = "study"
     done: bool = False
+
+    @model_validator(mode="after")
+    def check_time(self) -> "PlanItemIn":
+        validate_time_range(self.start, self.end)
+        return self
 
 
 class PlanIn(BaseModel):

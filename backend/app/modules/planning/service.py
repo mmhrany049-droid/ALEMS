@@ -143,7 +143,8 @@ def generate_week(db: Session, user: User, week_start: date,
     for goal in goals:
         span = max(1, (min(goal.end_date, days[-1]) - max(goal.start_date, days[0])).days + 1)
         target_minutes = _goal_minutes(goal)
-        per_day = max(1, target_minutes // max(1, min(span, 7)))
+        # تقسیم سقفی: کل دقیقه هدف باید در هفته جا شود (نه کسر باقیمانده تقسیم صحیح)
+        per_day = max(1, -(-target_minutes // max(1, min(span, 7))))
         goal_inputs.append({
             "title": goal.title, "subject": (goal.target_value or {}).get("subject"),
             "minutes": per_day, "goal_id": str(goal.id),
