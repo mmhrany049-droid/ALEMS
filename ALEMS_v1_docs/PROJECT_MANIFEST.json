@@ -1,0 +1,48 @@
+{
+  "project": "ALEMS",
+  "full_name": "Academic Life & Exam Management System",
+  "name_fa": "سامانه مدیریت زندگی تحصیلی و مسیر کنکور",
+  "version": "1.0.0",
+  "docs_version": "1.0.0",
+  "created_at": "2026-09-19",
+  "repository": "https://github.com/mmhrany049-droid/ALEMS",
+  "language": "fa",
+  "direction": "rtl",
+  "calendar": "jalali",
+  "week_start": "saturday",
+  "timezone": "Asia/Tehran",
+  "stack": {
+    "backend": ["Python", "FastAPI", "SQLAlchemy", "Pydantic", "Alembic", "SQLite"],
+    "frontend": ["Node.js", "React", "Vite", "TypeScript", "Tailwind CSS", "jalaali-js"],
+    "export": ["PDF", "Excel", "JSON"]
+  },
+  "architecture": "modular-monolith",
+  "offline_first": true,
+  "phases": [
+    "0-foundation",
+    "1-identity-profile",
+    "2-knowledge-base",
+    "3-activity-review",
+    "4-planning",
+    "5-exam-analytics",
+    "6-backup-polish"
+  ],
+  "documents": [
+    "00_MASTER_README.md",
+    "01_VISION_SCOPE.md",
+    "02_DOMAIN_REQUIREMENTS.md",
+    "03_SYSTEM_ARCHITECTURE.md",
+    "04_MODULE_CATALOG.md",
+    "05_DATABASE_SPEC.md",
+    "06_API_CONTRACT.md",
+    "07_UI_UX_GUIDELINES.md",
+    "08_BUSINESS_RULES_EDGE_CASES.md",
+    "09_CODING_AGENT_PROMPTS.md",
+    "10_ACCEPTANCE_TESTS.md",
+    "11_ROADMAP_PHASES.md",
+    "PROJECT_MANIFEST.json"
+  ],
+  "primary_user": "student",
+  "target_audience": "Iranian high-school students preparing for Konkur",
+  "license_note": " foreseen as private or personal-use project"
+}
