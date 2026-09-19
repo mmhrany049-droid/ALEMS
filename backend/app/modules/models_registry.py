@@ -23,3 +23,4 @@ from app.modules.identity.models import SessionToken, User  # noqa: F401
 from app.modules.planning.models import Goal, Plan, TimeBlock  # noqa: F401
 from app.modules.settings.models import AppSetting  # noqa: F401
 from app.modules.student.models import StudentProfile, StudentState  # noqa: F401
+from app.core.versioning import SchemaVersion  # noqa: F401 — Version Management

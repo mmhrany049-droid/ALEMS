@@ -24,15 +24,21 @@ logger = logging.getLogger("alems")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
+    from app.core.files import ensure_standard_dirs
     from app.modules.seed import ensure_defaults  # noqa: F401 — بارگذاری مقادیر پیش‌فرض
+    from app.core.versioning import ensure_schema_version_record
     from app.db.session import SessionLocal
 
+    dirs = ensure_standard_dirs()
     db = SessionLocal()
     try:
         ensure_defaults(db)
+        ensure_schema_version_record(db)
     finally:
         db.close()
-    logger.info("ALEMS v%s راه‌اندازی شد", settings.app_version)
+    logger.info("ALEMS v%s راه‌اندازی شد (schema v%s) — مسیرها: %s",
+                settings.app_version, settings.schema_version,
+                " · ".join(f"{k}={v}" for k, v in dirs.items()))
     yield
     logger.info("ALEMS خاموش شد")
 
@@ -91,21 +97,27 @@ async def alems_error_handler(request: Request, exc: AlemsError) -> JSONResponse
 
 @app.get("/health")
 def health() -> dict:
-    """سلامت برنامه (AT-01)."""
-    from app.db.session import engine
+    """سلامت برنامه (AT-01) + اطلاعات نسخه (Version Management)."""
+    from app.core.versioning import schema_state, version_info
+    from app.db.session import SessionLocal, engine
 
     db_ok = True
+    schema: dict = {"recorded": False, "up_to_date": False}
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+        db = SessionLocal()
+        try:
+            schema = schema_state(db)
+        finally:
+            db.close()
     except Exception:  # noqa: BLE001
         db_ok = False
     return {
         "success": db_ok,
         "status": "ok" if db_ok else "degraded",
-        "app": settings.app_name,
-        "version": settings.app_version,
-        "schema_version": settings.schema_version,
+        **version_info(),
+        "database": {"connected": db_ok, "schema": schema},
     }
 
 

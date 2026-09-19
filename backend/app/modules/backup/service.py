@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.core.config import settings
+from app.core.files import backups_dir
 from app.shared.exceptions import NotFoundError, ValidationError
 
 NAME_RE = re.compile(r"^alems-backup-\d{8}-\d{6}(\.db|\.zip)$")
@@ -29,7 +30,7 @@ def create_backup(*, encrypted: bool = False, password: str | None = None) -> di
     now = datetime.now()
     stamp = now.strftime("%Y%m%d-%H%M%S")
     db_path = _db_path()
-    raw_path = settings.backups_dir / f"alems-backup-{stamp}.db"
+    raw_path = backups_dir() / f"alems-backup-{stamp}.db"
 
     # کپی امن با sqlite backup API (سازگار حتی هنگام استفاده)
     src = sqlite3.connect(str(db_path))
@@ -41,7 +42,7 @@ def create_backup(*, encrypted: bool = False, password: str | None = None) -> di
 
     if encrypted and password:
         final_name = f"alems-backup-{stamp}.zip"
-        final_path = settings.backups_dir / final_name
+        final_path = backups_dir() / final_name
         import pyzipper
 
         with pyzipper.AESZipFile(final_path, "w", compression=pyzipper.ZIP_DEFLATED,
@@ -65,7 +66,7 @@ def create_backup(*, encrypted: bool = False, password: str | None = None) -> di
 def list_backups() -> list[dict]:
     """فهرست پشتیبان‌های موجود."""
     result = []
-    for path in sorted(settings.backups_dir.glob("alems-backup-*"), reverse=True):
+    for path in sorted(backups_dir().glob("alems-backup-*"), reverse=True):
         if not NAME_RE.match(path.name):
             continue
         result.append({
@@ -82,7 +83,7 @@ def get_backup_path(backup_id: str) -> Path:
     """مسیر فایل پشتیبان با اعتبارسنجی نام (جلوگیری از path traversal)."""
     if not NAME_RE.match(backup_id):
         raise NotFoundError("پشتیبان مورد نظر یافت نشد.")
-    path = settings.backups_dir / backup_id
+    path = backups_dir() / backup_id
     if not path.exists():
         raise NotFoundError("پشتیبان مورد نظر یافت نشد.")
     return path
@@ -101,7 +102,7 @@ def restore_backup(backup_id: str, *, mode: str = "replace",
     source = get_backup_path(backup_id)
     db_path = _db_path()
 
-    tmp_path = settings.backups_dir / f".restore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.db"
+    tmp_path = backups_dir() / f".restore-{datetime.now().strftime('%Y%m%d-%H%M%S')}.db"
     if source.suffix == ".zip":
         import pyzipper
 

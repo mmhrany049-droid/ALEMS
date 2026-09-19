@@ -40,6 +40,7 @@ ALEMS/
 │   ├── app/
 │   │   ├── main.py               # FastAPI + پاکت پاسخ {success,data,error,meta} + خطاهای فارسی
 │   │   ├── core/                 # config · security (bcrypt+JWT) · jalali · Event Bus · logging
+│   │   │                         #   files (مسیرهای استاندارد+JSON) · versioning (schema_version)
 │   │   ├── db/                   # SQLAlchemy 2.0 (SQLite + WAL)
 │   │   ├── shared/               # خطاهای دامنه · صفحه‌بندی · پاسخ استاندارد
 │   │   ├── modules/              # مرزهای واضح هر ماژول:
@@ -57,7 +58,8 @@ ALEMS/
 │   │   └── api/v1.py             # مونتاژ روترها — Base URL: /api/v1
 │   ├── alembic/                  # مهاجرت‌ها (migration-first)
 │   ├── samples/sample_book.json  # قالب استاندارد کتاب تست
-│   ├── tests/                    # ۸۳ تست (دامنه + پذیرش)
+│   ├── tests/                    # ۱۰۰ تست (فاز ۰ + دامنه + پذیرش AT-01..27)
+│   ├── requirements.txt          # وابستگی‌ها (هم‌ارز pyproject)
 │   └── data/ · backups/ · exports/ · imports/   # مسیرهای استاندارد (خارج از Git)
 ├── frontend/
 │   └── src/

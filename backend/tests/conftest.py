@@ -19,9 +19,17 @@ from app.main import app  # noqa: E402
 from app.db.session import Base, engine  # noqa: E402
 
 
+def db_session():
+    """نشست مستقیم دیتابیس برای تست‌های زیرساختی."""
+    from app.db.session import SessionLocal
+
+    return SessionLocal()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _setup_db():
     """ساخت جداول + مقادیر پیش‌فرض یک‌بار برای کل جلسه تست."""
+    from app.modules import models_registry  # noqa: F401 — ثبت همه مدل‌ها در metadata
     Base.metadata.create_all(bind=engine)
     from app.modules.seed import ensure_defaults
     from app.db.session import SessionLocal
