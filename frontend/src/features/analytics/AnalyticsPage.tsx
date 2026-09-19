@@ -5,7 +5,8 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { errorMessage, get } from '../../lib/api';
+import { downloadFile, errorMessage, get } from '../../lib/api';
+import { useToast } from '../../components/Toast';
 import { EmptyState, PageHeader, Spinner } from '../../components/ui';
 import type { MistakeStat, SubjectStat, TopicStat } from '../../types';
 import { faNumber, faPercent, formatJalali, toFaDigits } from '../../lib/jalali';
@@ -31,6 +32,21 @@ interface DifficultyRow {
 
 export default function AnalyticsPage() {
   const [range, setRange] = useState<7 | 30 | 0>(30);
+  const [downloading, setDownloading] = useState(false);
+  const toast = useToast();
+
+  const handleDownload = async (kind: 'pdf' | 'excel') => {
+    setDownloading(true);
+    try {
+      await downloadFile(`/api/v1/export/${kind}?type=weekly`,
+        kind === 'pdf' ? 'alems-weekly.pdf' : 'alems-weekly.xlsx');
+      toast.show(kind === 'pdf' ? 'PDF گزارش هفتگی دانلود شد 📄' : 'Excel گزارش هفتگی دانلود شد 📊');
+    } catch (e) {
+      toast.show(errorMessage(e), 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const toDate = new Date().toISOString().slice(0, 10);
   const fromDate = range > 0 ? new Date(Date.now() - (range - 1) * 86400000).toISOString().slice(0, 10) : undefined;
@@ -43,6 +59,10 @@ export default function AnalyticsPage() {
   const { data: bySubject, isLoading: loadingSubject } = useQuery({
     queryKey: ['analytics-subject', range],
     queryFn: () => get<SubjectStat[]>('/analytics/by-subject', rangeParams),
+  });
+  const weekly = useQuery({
+    queryKey: ['weekly-report'],
+    queryFn: () => get<WeeklyReport>('/reports/weekly'),
   });
   const { data: byTopic } = useQuery({
     queryKey: ['analytics-topic', range],
@@ -105,6 +125,60 @@ export default function AnalyticsPage() {
         />
       ) : (
         <div className="space-y-6">
+          {/* گزارش هفتگی + خروجی PDF/Excel */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <h2 className="font-bold text-slate-900">گزارش هفتگی</h2>
+                {weekly.data?.data && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    هفته {weekly.data.data.week_start_label} تا {weekly.data.data.week_end_label}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button className="btn-secondary !py-1.5 text-xs"
+                        disabled={downloading}
+                        onClick={() => handleDownload('pdf')}>
+                  📄 خروجی PDF
+                </button>
+                <button className="btn-secondary !py-1.5 text-xs"
+                        disabled={downloading}
+                        onClick={() => handleDownload('excel')}>
+                  📊 خروجی Excel
+                </button>
+              </div>
+            </div>
+            {weekly.isLoading ? <Spinner /> : weekly.data?.data ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-slate-400 border-b border-slate-100">
+                      <th className="text-right px-3 py-2 font-medium">روز</th>
+                      <th className="text-right px-3 py-2 font-medium">تست‌ها</th>
+                      <th className="text-right px-3 py-2 font-medium">درصد کنکوری</th>
+                      <th className="text-right px-3 py-2 font-medium">مطالعه</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weekly.data.data.per_day.map((d) => (
+                      <tr key={d.date} className="border-b border-slate-50">
+                        <td className="px-3 py-2 text-slate-700">{d.date_label}</td>
+                        <td className="px-3 py-2 text-slate-600">{toFaDigits(d.tests.total)}</td>
+                        <td className="px-3 py-2 font-bold">
+                          <span className={d.tests.percent_konkur !== null && d.tests.percent_konkur < 0 ? 'text-red-600' : 'text-emerald-600'}>
+                            {faPercent(d.tests.percent_konkur)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">{toFaDigits(d.activities_minutes)} دقیقه</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-xs text-slate-400">گزارش در دسترس نیست.</p>}
+          </div>
+
           {/* نمودار خطی روند */}
           <div className="card">
             <h2 className="font-bold text-slate-900 mb-4">روند درصد کنکوری (۸ هفته اخیر)</h2>
@@ -264,4 +338,17 @@ export default function AnalyticsPage() {
       )}
     </div>
   );
+}
+
+interface WeeklyReportDay {
+  date: string; date_label: string;
+  tests: { total: number; correct: number; wrong: number; blank: number; percent_konkur: number | null };
+  activities_minutes: number;
+}
+interface WeeklyReport {
+  week_start_label: string; week_end_label: string;
+  per_day: WeeklyReportDay[];
+  tests: { total: number; correct: number; wrong: number; blank: number; percent_konkur: number | null };
+  review: { pending: number; done: number };
+  by_subject: { subject: string; total: number; percent_konkur: number | null }[];
 }

@@ -10,6 +10,7 @@ from app.modules.exam.domain import ExamPolicy, ScoringPolicy
 from app.modules.planning.domain import PlanningPolicy
 from app.modules.settings.domain import DefaultPolicies
 from app.modules.settings.models import AppSetting
+from sqlalchemy.orm.attributes import flag_modified
 
 DEFAULTS = DefaultPolicies()
 
@@ -35,9 +36,10 @@ def set_setting(db: Session, key: str, value: dict) -> dict:
         row = AppSetting(key=key, value=value)
         db.add(row)
     else:
-        current = row.value or {}
-        current.update(value)
-        row.value = current
+        # ادغام با شیء جدید + علامت‌گذاری صریح — وگرنه SQLAlchemy تغییر
+        # دیکشنری JSON درجا را تشخیص نمی‌دهد و UPDATE انجام نمی‌شود
+        row.value = {**(row.value or {}), **value}
+        flag_modified(row, "value")
     db.commit()
     return row.value
 
