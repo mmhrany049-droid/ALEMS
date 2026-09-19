@@ -9,10 +9,15 @@ from app.shared.exceptions import ValidationError
 
 @dataclass
 class ImportedTopic:
-    """مبحث استخراج‌شده از فایل کتاب."""
+    """مبحث استخراج‌شده از فایل کتاب — زیرمبحث‌ها یک سطح پایین‌تر."""
 
     title: str
     questions: list["ImportedQuestion"] = field(default_factory=list)
+    subtopics: list["ImportedTopic"] = field(default_factory=list)
+
+    def all_questions(self) -> list["ImportedQuestion"]:
+        """سوالات مبحث + همه زیرمباحث."""
+        return self.questions + [q for st in self.subtopics for q in st.questions]
 
 
 @dataclass
@@ -31,12 +36,14 @@ class ImportedBook:
     title: str
     publisher: str | None
     subject_name: str | None
+    subject_field: str | None = None
+    subject_grade: str | None = None
     resource_type: str = "book_test"
     chapters: list[ImportedChapter] = field(default_factory=list)
 
     @property
     def question_count(self) -> int:
-        return sum(len(t.questions) for ch in self.chapters for t in ch.topics)
+        return sum(len(t.all_questions()) for ch in self.chapters for t in ch.topics)
 
 
 @dataclass
@@ -92,6 +99,73 @@ def parse_importance(raw, default: int = 1) -> int:  # noqa: ANN001
     return value
 
 
+def _parse_questions(
+    questions_raw, topic_path: str, seen_numbers: set[tuple[str, str]],
+) -> list[ImportedQuestion]:
+    """پارس فهرست سوالات یک مبحث/زیرمبحث با اعتبارسنجی کامل."""
+    if not isinstance(questions_raw, list) or not questions_raw:
+        raise ValidationError(f"«{topic_path}» باید حداقل یک سوال داشته باشد.")
+    questions: list[ImportedQuestion] = []
+    for q_raw in questions_raw:
+        if not isinstance(q_raw, dict):
+            raise ValidationError(f"سوال در «{topic_path}» باید یک شیء JSON باشد.")
+        number = _clean(q_raw.get("number"))
+        if not number:
+            raise ValidationError(f"شماره سوال در «{topic_path}» الزامی است.")
+        key = (topic_path, number)
+        if key in seen_numbers:
+            raise ValidationError(f"شماره سوال «{number}» در «{topic_path}» تکراری است.")
+        seen_numbers.add(key)
+        tags_raw = q_raw.get("tags", [])
+        if not isinstance(tags_raw, list):
+            tags_raw = [str(tags_raw)]
+        questions.append(ImportedQuestion(
+            number=number,
+            correct_answer=normalize_answer(q_raw.get("answer", q_raw.get("correct_answer"))),
+            difficulty=normalize_difficulty(q_raw.get("difficulty")),
+            importance=parse_importance(q_raw.get("importance")),
+            tags=[str(t) for t in tags_raw],
+            text=_clean(q_raw.get("text")) or None,
+        ))
+    return questions
+
+
+def _parse_topic(
+    tp_raw, chapter_title: str, seen_numbers: set[tuple[str, str]],
+) -> ImportedTopic:
+    """پارس یک مبحث — با پشتیبانی اختیاری زیرمبحث (یک سطح، مطابق درخت سند)."""
+    if not isinstance(tp_raw, dict):
+        raise ValidationError(f"مبحث در فصل «{chapter_title}» باید یک شیء JSON باشد.")
+    tp_title = _clean(tp_raw.get("title"))
+    if not tp_title:
+        raise ValidationError(f"عنوان مبحث در فصل «{chapter_title}» الزامی است.")
+    topic = ImportedTopic(title=tp_title)
+    topic.questions = _parse_questions(tp_raw.get("questions", []), tp_title, seen_numbers)
+
+    # زیرمباحث اختیاری — فقط یک سطح (زیرِ زیرمبحث مجاز نیست)
+    subtopics_raw = tp_raw.get("subtopics", [])
+    if subtopics_raw:
+        if not isinstance(subtopics_raw, list):
+            raise ValidationError(f"«subtopics» مبحث «{tp_title}» باید یک فهرست باشد.")
+        for st_raw in subtopics_raw:
+            if not isinstance(st_raw, dict):
+                raise ValidationError(f"زیرمبحث در «{tp_title}» باید یک شیء JSON باشد.")
+            st_title = _clean(st_raw.get("title"))
+            if not st_title:
+                raise ValidationError(f"عنوان زیرمبحث در «{tp_title}» الزامی است.")
+            st_path = f"{tp_title} - {st_title}"
+            subtopic = ImportedTopic(title=st_title)
+            subtopic.questions = _parse_questions(
+                st_raw.get("questions", []), st_path, seen_numbers)
+            if st_raw.get("subtopics"):
+                raise ValidationError(
+                    f"زیرمبحث «{st_title}» نمی‌تواند خودش زیرمبحث داشته باشد "
+                    "(درخت فقط تا زیرمبحث است: درس ← فصل ← مبحث ← زیرمبحث)."
+                )
+            topic.subtopics.append(subtopic)
+    return topic
+
+
 def parse_book_json(data: dict) -> ImportedBook:
     """تبدیل JSON کتاب به ImportedBook — بدون دسترسی به دیتابیس (قابل‌تست).
 
@@ -126,6 +200,8 @@ def parse_book_json(data: dict) -> ImportedBook:
         title=title,
         publisher=_clean(data.get("publisher")) or None,
         subject_name=_clean(data.get("subject")) or None,
+        subject_field=_clean(data.get("field")) or None,
+        subject_grade=_clean(data.get("grade")) or None,
         resource_type=resource_type,
     )
 
@@ -145,37 +221,7 @@ def parse_book_json(data: dict) -> ImportedBook:
         if not isinstance(topics_raw, list) or not topics_raw:
             raise ValidationError(f"فصل «{ch_title}» باید حداقل یک مبحث داشته باشد. «سوالات بدون مبحث معتبر وارد نمی‌شوند.»")
         for ti, tp_raw in enumerate(topics_raw):
-            if not isinstance(tp_raw, dict):
-                raise ValidationError(f"مبحث شماره {ti + 1} فصل «{ch_title}» باید یک شیء JSON باشد.")
-            tp_title = _clean(tp_raw.get("title"))
-            if not tp_title:
-                raise ValidationError(f"عنوان مبحث شماره {ti + 1} فصل «{ch_title}» الزامی است.")
-            topic = ImportedTopic(title=tp_title)
-            questions_raw = tp_raw.get("questions", [])
-            if not isinstance(questions_raw, list) or not questions_raw:
-                raise ValidationError(f"مبحث «{tp_title}» باید حداقل یک سوال داشته باشد.")
-            for q_raw in questions_raw:
-                if not isinstance(q_raw, dict):
-                    raise ValidationError(f"سوال در مبحث «{tp_title}» باید یک شیء JSON باشد.")
-                number = _clean(q_raw.get("number"))
-                if not number:
-                    raise ValidationError(f"شماره سوال در مبحث «{tp_title}» الزامی است.")
-                key = (tp_title, number)
-                if key in seen_numbers:
-                    raise ValidationError(f"شماره سوال «{number}» در مبحث «{tp_title}» تکراری است.")
-                seen_numbers.add(key)
-                tags_raw = q_raw.get("tags", [])
-                if not isinstance(tags_raw, list):
-                    tags_raw = [str(tags_raw)]
-                topic.questions.append(ImportedQuestion(
-                    number=number,
-                    correct_answer=normalize_answer(q_raw.get("answer", q_raw.get("correct_answer"))),
-                    difficulty=normalize_difficulty(q_raw.get("difficulty")),
-                    importance=parse_importance(q_raw.get("importance")),
-                    tags=[str(t) for t in tags_raw],
-                    text=_clean(q_raw.get("text")) or None,
-                ))
-            chapter.topics.append(topic)
+            chapter.topics.append(_parse_topic(tp_raw, ch_title, seen_numbers))
         book.chapters.append(chapter)
 
     if book.question_count == 0:

@@ -1,0 +1,80 @@
+{
+  "title": "کتاب تست حسابان دوازدهم — نشر گام",
+  "publisher": "نشر گام",
+  "subject": "حسابان",
+  "resource_type": "book_test",
+  "chapters": [
+    {
+      "title": "فصل تابع",
+      "topics": [
+        {
+          "title": "تعریف تابع",
+          "questions": [
+            {
+              "number": "1",
+              "answer": "2",
+              "difficulty": "آسان",
+              "importance": 2,
+              "tags": ["تابع", "تشخیص"],
+              "text": "کدام رابطه یک تابع است؟"
+            },
+            {
+              "number": "2",
+              "answer": "3",
+              "difficulty": "متوسط",
+              "importance": 3
+            },
+            {
+              "number": "3",
+              "answer": "1",
+              "difficulty": "سخت",
+              "importance": 5,
+              "tags": ["قلمرو"]
+            }
+          ]
+        },
+        {
+          "title": "دامنه و برد",
+          "questions": [
+            { "number": "1", "answer": "4", "difficulty": "متوسط", "importance": 2 }
+          ],
+          "subtopics": [
+            {
+              "title": "دامنه توابع جبری",
+              "questions": [
+                { "number": "1", "answer": "3", "difficulty": "آسان", "importance": 3, "tags": ["ریشه"] },
+                { "number": "2", "answer": "2", "difficulty": "متوسط" }
+              ]
+            },
+            {
+              "title": "برد تابع",
+              "questions": [
+                { "number": "1", "answer": "1", "difficulty": "سخت", "importance": 4 },
+                { "number": "2", "answer": "5", "difficulty": "متوسط", "importance": 2 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "فصل حد",
+      "topics": [
+        {
+          "title": "حد در بی‌نهایت",
+          "questions": [
+            {
+              "number": "1",
+              "answer": "3",
+              "difficulty": "سخت",
+              "importance": 5,
+              "tags": ["مشتق‌گیری"]
+            },
+            { "number": "2", "answer": "2", "difficulty": "متوسط", "importance": 3 },
+            { "number": "3", "answer": "1", "difficulty": "آسان", "importance": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

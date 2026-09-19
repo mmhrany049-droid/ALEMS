@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.modules.academic.domain import ImportedBook, ImportedChapter, ImportedTopic, parse_book_json
 from app.modules.academic.models import Chapter, Question, Resource, Subject, Topic
-from app.shared.exceptions import NotFoundError, ValidationError
+from app.shared.exceptions import ConflictError, NotFoundError, ValidationError
 
 
 # ---------- درخت دروس ----------
@@ -135,8 +135,10 @@ def import_book(db: Session, data: dict, *, update_existing: bool = False) -> di
 
     existing = find_resource(db, book.title, book.publisher)
     if existing is not None and not update_existing:
-        raise ValidationError(
-            f"کتابی با عنوان «{book.title}» و همین ناشر قبلاً وارد شده است.",
+        # قانون ۸.۵: کتاب تکراری = تعارض — هشدار با گزینه «به‌روزرسانی»
+        raise ConflictError(
+            f"کتابی با عنوان «{book.title}» و همین ناشر قبلاً وارد شده است. "
+            "می‌توانید آن را به‌روزرسانی کنید.",
             details={"duplicate": True, "resource_id": str(existing.id),
                      "options": ["update_existing=true برای به‌روزرسانی"]},
         )
@@ -149,7 +151,16 @@ def import_book(db: Session, data: dict, *, update_existing: bool = False) -> di
 
     subject: Subject | None = None
     if book.subject_name:
-        subject = db.scalar(select(Subject).where(Subject.name == book.subject_name).limit(1))
+        if book.subject_field and book.subject_grade:
+            # تطبیق دقیق: نام + رشته + پایه
+            subject = db.scalar(select(Subject).where(
+                Subject.name == book.subject_name,
+                Subject.field == book.subject_field,
+                Subject.grade == book.subject_grade,
+            ).limit(1))
+        if subject is None:
+            subject = db.scalar(select(Subject).where(
+                Subject.name == book.subject_name).limit(1))
     resource.subject_id = subject.id if subject else resource.subject_id
     resource.resource_metadata = {
         "imported_question_count": book.question_count,
@@ -179,6 +190,23 @@ def import_book(db: Session, data: dict, *, update_existing: bool = False) -> di
                     tags=q.tags,
                     text=q.text,
                 ))
+            # زیرمباحث (درخت: مبحث ← زیرمبحث)
+            for st_index, sub_data in enumerate(topic_data.subtopics):
+                subtopic = Topic(chapter_id=chapter.id, title=sub_data.title,
+                                 parent_id=topic.id, order_index=st_index)
+                db.add(subtopic)
+                db.flush()
+                for q in sub_data.questions:
+                    db.add(Question(
+                        resource_id=resource.id,
+                        topic_id=subtopic.id,
+                        number=q.number,
+                        correct_answer=q.correct_answer,
+                        difficulty=q.difficulty,
+                        importance=q.importance,
+                        tags=q.tags,
+                        text=q.text,
+                    ))
     db.commit()
     db.refresh(resource)
     return {
@@ -186,6 +214,7 @@ def import_book(db: Session, data: dict, *, update_existing: bool = False) -> di
         "title": resource.title,
         "chapters": len(book.chapters),
         "topics": sum(len(ch.topics) for ch in book.chapters),
+        "subtopics": sum(len(t.subtopics) for ch in book.chapters for t in ch.topics),
         "questions": book.question_count,
         "updated": existing is not None,
         "subject_matched": subject.name if subject else None,
@@ -250,6 +279,7 @@ def question_payload(question: Question) -> dict:
         "resource_id": str(question.resource_id),
         "topic_id": str(question.topic_id),
         "topic_title": topic.title if topic else None,
+        "parent_topic_id": str(topic.parent_id) if topic and topic.parent_id else None,
         "chapter_title": chapter.title if chapter else None,
         "subject_name": subject.name if subject else None,
         "number": question.number,
@@ -258,3 +288,59 @@ def question_payload(question: Question) -> dict:
         "tags": question.tags or [],
         "text": question.text,
     }
+
+
+def resource_topic_tree(db: Session, resource_id: uuid.UUID) -> list[dict]:
+    """درخت مباحث یک منبع (فصل ← مبحث ← زیرمبحث) با تعداد سوال.
+
+    فصل‌ها فقط شامل مبحث‌هایی است که سوالِ همین منبع دارند (چون درخت فصل/مبحث
+    در سطح درس مشترک است، اما این نما مال یک کتاب مشخص است).
+    """
+    get_resource(db, resource_id)
+    counts: dict[uuid.UUID, int] = dict(db.execute(
+        select(Question.topic_id, func.count()).where(Question.resource_id == resource_id)
+        .group_by(Question.topic_id)
+    ).all())
+
+    resource = db.get(Resource, resource_id)
+    subject = db.get(Subject, resource.subject_id) if resource.subject_id else None
+    topic_ids = list(counts.keys())
+    chapters = []
+    if topic_ids:
+        chapter_ids = db.scalars(
+            select(Topic.chapter_id).where(Topic.id.in_(topic_ids))
+        ).all()
+        chapters = db.scalars(
+            select(Chapter).where(Chapter.id.in_(set(chapter_ids)))
+            .order_by(Chapter.order_index)
+        ).all()
+
+    chapters_nodes = []
+    for chapter in chapters:
+        topics = db.scalars(
+            select(Topic).where(Topic.chapter_id == chapter.id, Topic.parent_id.is_(None))
+            .order_by(Topic.order_index)
+        ).all()
+        node = {"id": str(chapter.id), "title": chapter.title, "topics": []}
+        for topic in topics:
+            subtopics = db.scalars(
+                select(Topic).where(Topic.parent_id == topic.id)
+                .order_by(Topic.order_index)
+            ).all()
+            node["topics"].append({
+                "id": str(topic.id),
+                "title": topic.title,
+                "question_count": counts.get(topic.id, 0),
+                "subtopics": [
+                    {"id": str(st.id), "title": st.title,
+                     "question_count": counts.get(st.id, 0), "parent_id": str(topic.id)}
+                    for st in subtopics
+                ],
+            })
+        chapters_nodes.append(node)
+
+    return [{
+        "resource": resource_payload(resource, question_count=sum(counts.values())),
+        "subject": subject_payload(subject) if subject else None,
+        "chapters": chapters_nodes,
+    }]

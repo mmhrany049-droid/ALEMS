@@ -160,7 +160,7 @@ class TestKnowledgeBase:
         book["title"] = f"کتاب تکراری — {uuid.uuid4().hex[:6]}"
         _import_sample_book(auth_client, book)
         r = auth_client.post("/api/v1/resources/import-book", json=book)
-        assert r.status_code == 422
+        assert r.status_code == 409  # تعارض — قانون ۸.۵
         assert r.json()["error"]["details"].get("duplicate") is True
         # به‌روزرسانی با پرچم
         r = auth_client.post(

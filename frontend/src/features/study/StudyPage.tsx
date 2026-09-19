@@ -1,5 +1,6 @@
 // صفحه مطالعه — ثبت فعالیت و مشاهده منابع
 import { useState } from 'react';
+import KnowledgeTree from './KnowledgeTree';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { errorMessage, get, post } from '../../lib/api';
 import { useToast } from '../../components/Toast';
@@ -12,6 +13,7 @@ const TYPES = ['study', 'test', 'review', 'class', 'school'] as const;
 export default function StudyPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<'activities' | 'tree'>('activities');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     type: 'study' as (typeof TYPES)[number],
@@ -65,6 +67,19 @@ export default function StudyPage() {
         }
       />
 
+      <div className="flex gap-2 mb-5 bg-slate-100 rounded-xl p-1 w-fit">
+        {([['activities', 'فعالیت‌ها'], ['tree', 'درخت دروس']] as const).map(([key, label]) => (
+          <button key={key}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === key ? 'bg-white shadow text-primary-700' : 'text-slate-500'}`}
+            onClick={() => setTab(key)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'tree' && <KnowledgeTree />}
+
+      {tab === 'activities' && (<>
       {/* منابع */}
       <h2 className="font-bold text-slate-900 mb-3">منابع من</h2>
       {(resources?.data ?? []).length === 0 ? (
@@ -129,6 +144,8 @@ export default function StudyPage() {
           </table>
         </div>
       )}
+
+      </>)}
 
       {/* فرم ثبت فعالیت */}
       <Modal open={showForm} onClose={() => setShowForm(false)} title="ثبت فعالیت جدید">
