@@ -8,9 +8,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from pydantic import BaseModel, Field
+
 from app.modules.activity.service import (
     complete_review,
     list_review_queue,
+    postpone_review,
     reopen_review,
     review_item_payload,
 )
@@ -52,6 +55,23 @@ def post_complete(
 ) -> dict:
     """علامت‌گذاری «مرور شد» + پیشنهاد مرور بعدی (چرخه ۱-۳-۷-۱۴) (AT-14)."""
     item = complete_review(db, user.id, item_id)
+    return ok(review_item_payload(item))
+
+
+class PostponeIn(BaseModel):
+    days: int = Field(1, ge=1, le=30, description="چند روز بعد؟ (پیش‌فرض ۱)")
+
+
+@router.post("/{item_id}/postpone", response_model=dict)
+def post_postpone(
+    item_id: uuid.UUID,
+    payload: PostponeIn | None = None,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """«بعداً» — به‌عقب‌انداختن مرور (سند 07 §7.4)."""
+    item = postpone_review(db, user.id, item_id,
+                           days=payload.days if payload else 1)
     return ok(review_item_payload(item))
 
 

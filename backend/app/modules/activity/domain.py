@@ -73,6 +73,14 @@ class ReviewPolicy:
         index = min(max(review_count, 0), len(self.intervals_days) - 1)
         return base + dt.timedelta(days=self.intervals_days[index])
 
+    def should_reenter(self, review_count: int) -> bool:
+        """آیا آیتم مرور‌شده با این تعداد، هنگام سررسید باید به صف برگردد؟
+
+        چرخه پس از اتمام همه فاصله‌ها (مثلاً ۴ مرور در چرخه ۱-۳-۷-۱۴) کامل است
+        و سوال «جذب‌شده» محسوب می‌شود؛ دیگر خودکار برنمی‌گردد.
+        """
+        return review_count < len(self.intervals_days)
+
 
 @dataclass
 class QueueEntryPlan:

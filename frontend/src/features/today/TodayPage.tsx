@@ -65,6 +65,15 @@ export default function TodayPage() {
     onError: (e) => toast.show(errorMessage(e), 'error'),
   });
 
+  const postponeReview = useMutation({
+    mutationFn: (id: string) => post(`/reviews/${id}/postpone`, { days: 1 }),
+    onSuccess: () => {
+      toast.show('مرور برای فردا به‌عقب افتاد ⏭');
+      void queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+    },
+    onError: (e) => toast.show(errorMessage(e), 'error'),
+  });
+
   const completeReview = useMutation({
     mutationFn: (id: string) => post(`/reviews/${id}/complete`),
     onSuccess: () => {
@@ -201,13 +210,22 @@ export default function TodayPage() {
                     سوال {item.question_number ?? '—'}
                     {item.topic_title && <span className="text-slate-400"> · {item.topic_title}</span>}
                   </div>
-                  <button
-                    className="btn-success !py-1 text-xs"
-                    onClick={() => completeReview.mutate(item.id)}
-                    disabled={completeReview.isPending}
-                  >
-                    الان مرور کردم
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      className="btn-secondary !py-1 text-xs"
+                      onClick={() => postponeReview.mutate(item.id)}
+                      disabled={postponeReview.isPending}
+                    >
+                      بعداً
+                    </button>
+                    <button
+                      className="btn-success !py-1 text-xs"
+                      onClick={() => completeReview.mutate(item.id)}
+                      disabled={completeReview.isPending}
+                    >
+                      الان مرور کردم
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

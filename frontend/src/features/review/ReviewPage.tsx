@@ -41,6 +41,16 @@ export default function ReviewPage() {
     onError: (e) => toast.show(errorMessage(e), 'error'),
   });
 
+  const postponed = useMutation({
+    mutationFn: ({ id, days }: { id: string; days?: number }) =>
+      post(`/reviews/${id}/postpone`, { days: days ?? 1 }),
+    onSuccess: () => {
+      toast.show('مرور برای بعد به‌عقب افتاد ⏭');
+      void queryClient.invalidateQueries({ queryKey: ['review-queue'] });
+    },
+    onError: (e) => toast.show(errorMessage(e), 'error'),
+  });
+
   const reopen = useMutation({
     mutationFn: (id: string) => post(`/reviews/${id}/reopen`),
     onSuccess: () => {
@@ -141,11 +151,19 @@ export default function ReviewPage() {
                 {formatJalali(item.scheduled_date)}
               </div>
               {item.status === 'pending' ? (
-                <button className="btn-success !py-1.5 text-xs"
-                        disabled={complete.isPending}
-                        onClick={() => complete.mutate(item.id)}>
-                  ✓ مرور شد
-                </button>
+                <div className="flex gap-1.5">
+                  <button className="btn-secondary !py-1.5 text-xs"
+                          disabled={postponed.isPending}
+                          title="به‌عقب‌انداختن به فردا"
+                          onClick={() => postponed.mutate({ id: item.id })}>
+                    بعداً
+                  </button>
+                  <button className="btn-success !py-1.5 text-xs"
+                          disabled={complete.isPending}
+                          onClick={() => complete.mutate(item.id)}>
+                    ✓ مرور شد
+                  </button>
+                </div>
               ) : (
                 <button className="btn-secondary !py-1.5 text-xs"
                         disabled={reopen.isPending}

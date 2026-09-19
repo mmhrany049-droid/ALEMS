@@ -79,6 +79,20 @@ def ensure_fallback_subject(db: Session) -> None:
         db.commit()
 
 
+def _on_question_marks_changed(payload: dict) -> None:
+    """اتصال رویداد: تغییر تیک → به‌روزرسانی صف مرور (تیک مرور/مهم/سخت وارد صف می‌شوند)."""
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        import uuid as _uuid
+
+        rebuild_review_queue(db, _uuid.UUID(payload["student_id"]))
+        logger.debug("صف مرور پس از تغییر تیک سوال %s به‌روزرسانی شد", payload.get("question_id"))
+    finally:
+        db.close()
+
+
 def _on_test_records_created(payload: dict) -> None:
     """اتصال رویداد: ثبت تست → به‌روزرسانی خودکار صف مرور."""
     from app.db.session import SessionLocal
@@ -96,6 +110,7 @@ def _on_test_records_created(payload: dict) -> None:
 def setup_events() -> None:
     """اتصال شنونده‌های رویداد (یک‌بار)."""
     event_bus.subscribe("test_records.created", _on_test_records_created)
+    event_bus.subscribe("question_marks.changed", _on_question_marks_changed)
 
 
 def ensure_defaults(db: Session) -> None:

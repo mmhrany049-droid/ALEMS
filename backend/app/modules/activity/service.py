@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -153,6 +153,9 @@ def add_mark(db: Session, student_id: uuid.UUID, question_id: uuid.UUID, mark_ty
         raise NotFoundError("سوال مورد نظر یافت نشد.")
     _upsert_mark(db, student_id, question_id, mark_type)
     db.commit()
+    # صف مرور باید تیک‌های مرور/مهم/سخت را ببیند (قانون ۸.۲ بند ۲)
+    event_bus.emit("question_marks.changed",
+                   {"student_id": str(student_id), "question_id": str(question_id)})
     return db.scalar(select(QuestionMark).where(
         QuestionMark.student_id == student_id,
         QuestionMark.question_id == question_id,
@@ -170,6 +173,8 @@ def remove_mark(db: Session, student_id: uuid.UUID, question_id: uuid.UUID, mark
         raise NotFoundError("این تیک روی سوال ثبت نشده است.")
     db.delete(row)
     db.commit()
+    event_bus.emit("question_marks.changed",
+                   {"student_id": str(student_id), "question_id": str(question_id)})
 
 
 def get_marks_map(db: Session, student_id: uuid.UUID) -> dict[str, list[str]]:
@@ -192,6 +197,20 @@ def rebuild_review_queue(db: Session, student_id: uuid.UUID) -> dict:
     """
     policy = get_review_policy(db)
     today = date.today()
+
+    # چرخه تکرار با فاصله: آیتم‌های done که مرور بعدی‌شان سررسید شده و چرخه‌شان
+    # هنوز کامل نشده، دوباره وارد صف می‌شوند (قانون ۸.۲ بند ۶ — ۱-۳-۷-۱۴)
+    due_items = db.scalars(select(ReviewItem).where(
+        ReviewItem.student_id == student_id,
+        ReviewItem.status == "done",
+        ReviewItem.scheduled_date <= today,
+    )).all()
+    reentered = 0
+    for item in due_items:
+        if policy.should_reenter(item.review_count):
+            item.status = "pending"
+            item.reviewed_at = None
+            reentered += 1
 
     # آخرین نتیجه هر سوال (قانون ۸.۳: آخرین نتیجه وضعیت جاری است)
     latest_subq = (
@@ -254,7 +273,8 @@ def rebuild_review_queue(db: Session, student_id: uuid.UUID) -> dict:
             removed += 1
 
     db.commit()
-    return {"added": added, "removed": removed, "pending": len(plans)}
+    return {"added": added, "removed": removed, "reentered": reentered,
+            "pending": len(plans)}
 
 
 def list_review_queue(
@@ -284,9 +304,27 @@ def complete_review(db: Session, student_id: uuid.UUID, item_id: uuid.UUID) -> R
         raise ValidationError("این آیتم قبلاً مرور شده است.")
     item.status = "done"
     item.reviewed_at = datetime.utcnow()
-    item.review_count += 1
     policy = get_review_policy(db)
+    # چرخه ۱→۳→۷→۱۴: فاصله بر اساس تعداد مرورهای «قبلی» است؛
+    # یعنی پس از مرور اول +۱ روز، دوم +۳، سوم +۷، چهارم +۱۴
     item.scheduled_date = policy.next_review_date(item.review_count, date.today())
+    item.review_count += 1
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def postpone_review(db: Session, student_id: uuid.UUID, item_id: uuid.UUID,
+                    days: int = 1) -> ReviewItem:
+    """به‌عقب‌انداختن مرور («بعداً») — همان آیتم pending می‌ماند و تاریخ جابه‌جا می‌شود."""
+    item = db.get(ReviewItem, item_id)
+    if item is None or item.student_id != student_id:
+        raise NotFoundError("آیتم مرور مورد نظر یافت نشد.")
+    if item.status != "pending":
+        raise ValidationError("فقط آیتم‌های در انتظار مرور قابل به‌عقب‌انداختن هستند.")
+    if not (1 <= days <= 30):
+        raise ValidationError("تعداد روز به‌عقب‌انداختن باید بین ۱ تا ۳۰ باشد.")
+    item.scheduled_date = max(item.scheduled_date, date.today()) + timedelta(days=days)
     db.commit()
     db.refresh(item)
     return item
