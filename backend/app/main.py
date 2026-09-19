@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -22,6 +23,30 @@ from app.core.logging import setup_logging
 logger = logging.getLogger("alems")
 
 
+def _ensure_schema() -> None:
+    """اگر پایگاه داده خالی/بدون جدول بود، مهاجرت‌های Alembic را اجرا کن (idempotent).
+
+    اجرای مستقیم uvicorn (بدون scripts/run.sh) روی فایل db تازه با خطای
+    «no such table» کرش می‌کرد؛ اکنون schema به‌صورت خودکار ساخته می‌شود.
+    """
+    import sqlalchemy as sa
+
+    from app.db.session import engine
+
+    try:
+        tables = set(sa.inspect(engine).get_table_names())
+    except sa.exc.OperationalError:
+        tables = set()
+    if "users" in tables or "schema_version" in tables:
+        return
+    from alembic import command
+    from alembic.config import Config
+
+    ini = Path(__file__).resolve().parents[1] / "alembic.ini"
+    command.upgrade(Config(str(ini)), "head")
+    logger.info("پایگاه داده خالی بود — مهاجرت‌های Alembic اجرا شد")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
@@ -31,6 +56,7 @@ async def lifespan(app: FastAPI):
     from app.db.session import SessionLocal
 
     dirs = ensure_standard_dirs()
+    _ensure_schema()
     db = SessionLocal()
     try:
         ensure_defaults(db)

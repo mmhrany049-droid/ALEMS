@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 import tempfile
 import uuid
+
+os.environ.setdefault("ALEMS_DISABLE_AUTO_BACKUP", "1")
 from pathlib import Path
 
 import pytest

@@ -41,13 +41,15 @@ def auto_enabled(monkeypatch):
 class TestAutoBackup:
     """پشتیبان خودکار — حداکثر یک‌بار در روز."""
 
-    def test_first_call_creates(self, backup_dir, auto_enabled):
+    def test_first_call_creates(self, backup_dir, auto_enabled, monkeypatch):
+        monkeypatch.delenv("ALEMS_DISABLE_AUTO_BACKUP", raising=False)
         result = maybe_auto_backup()
         assert result is not None
         assert result["filename"].startswith("alems-backup-")
         assert (backup_dir / result["filename"]).exists()
 
-    def test_second_call_same_day_skipped(self, backup_dir, auto_enabled):
+    def test_second_call_same_day_skipped(self, backup_dir, auto_enabled, monkeypatch):
+        monkeypatch.delenv("ALEMS_DISABLE_AUTO_BACKUP", raising=False)
         first = maybe_auto_backup()
         assert first is not None
         assert maybe_auto_backup() is None

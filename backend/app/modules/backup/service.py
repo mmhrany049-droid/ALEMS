@@ -70,6 +70,11 @@ def has_backup_today() -> bool:
 
 
 def maybe_auto_backup() -> dict | None:
+    import os
+
+    # در اجرای تست‌ها پوشه پشتیبان واقعی را آلوده نکن
+    if os.environ.get("ALEMS_DISABLE_AUTO_BACKUP", "").strip().lower() in {"1", "true", "yes"}:
+        return None
     """پشتیبان خودکار — حداکثر یک‌بار در روز (قانون ۸.۷).
 
     اگر کلید general.auto_backup_enabled در تنظیمات فعال (پیش‌فرض) باشد
