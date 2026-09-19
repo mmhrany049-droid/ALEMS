@@ -1,0 +1,41 @@
+{
+  "title": "کتاب تست نمونه — حسابان",
+  "publisher": "نشر نمونه",
+  "subject": "حسابان",
+  "resource_type": "book_test",
+  "chapters": [
+    {
+      "title": "فصل تابع",
+      "topics": [
+        {
+          "title": "تعریف تابع",
+          "questions": [
+            { "number": "1", "answer": "2", "difficulty": "easy", "importance": 2, "tags": ["تابع"] },
+            { "number": "2", "answer": "3", "difficulty": "medium" },
+            { "number": "3", "answer": "1", "difficulty": "hard", "importance": 4 }
+          ]
+        },
+        {
+          "title": "دامنه و برد",
+          "questions": [
+            { "number": "1", "answer": "4", "difficulty": "medium" },
+            { "number": "2", "answer": "2", "difficulty": "easy" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "فصل حد",
+      "topics": [
+        {
+          "title": "حد در بی‌نهایت",
+          "questions": [
+            { "number": "1", "answer": "3", "difficulty": "hard", "importance": 5 },
+            { "number": "2", "answer": "1", "difficulty": "medium" },
+            { "number": "3", "answer": "2", "difficulty": "easy" }
+          ]
+        }
+      ]
+    }
+  ]
+}

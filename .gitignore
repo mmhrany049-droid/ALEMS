@@ -1,0 +1,32 @@
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+backend/.venv/
+backend/alems.db
+
+# داده‌های کاربر (خارج از Git — با Backup/Export منتقل می‌شود)
+backend/data/
+backend/backups/
+backend/exports/
+backend/imports/
+*.db
+*.db-wal
+*.db-shm
+
+# --- Node / Frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# --- محیط و ابزارها ---
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+*.log

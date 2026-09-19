@@ -1,0 +1,38 @@
+[project]
+name = "alems-backend"
+version = "1.0.0"
+description = "ALEMS - Academic Life & Exam Management System (Backend)"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "bcrypt>=4.1",
+    "pyjwt>=2.8",
+    "python-multipart>=0.0.9",
+    "openpyxl>=3.1",
+    "reportlab>=4.2",
+    "arabic-reshaper>=3.0",
+    "python-bidi>=0.4.2",
+    "pyzipper>=0.3.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
