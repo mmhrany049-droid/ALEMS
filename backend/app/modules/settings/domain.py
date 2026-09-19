@@ -21,6 +21,8 @@ class DefaultPolicies:
     exam: ExamPolicy = field(default_factory=ExamPolicy)
     planning: PlanningPolicy = field(default_factory=PlanningPolicy)
 
+    auto_backup_enabled: bool = True
+
     def as_dict(self) -> dict:
         return {
             "scoring_policy": {"wrong_penalty": self.scoring.wrong_penalty},
@@ -33,4 +35,5 @@ class DefaultPolicies:
                 "break_minutes": self.planning.break_minutes,
                 "max_daily_items": self.planning.max_daily_items,
             },
+            "general": {"auto_backup_enabled": self.auto_backup_enabled},
         }

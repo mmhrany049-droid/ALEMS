@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -39,7 +40,23 @@ async def lifespan(app: FastAPI):
     logger.info("ALEMS v%s راه‌اندازی شد (schema v%s) — مسیرها: %s",
                 settings.app_version, settings.schema_version,
                 " · ".join(f"{k}={v}" for k, v in dirs.items()))
+
+    async def _auto_backup_loop() -> None:
+        """پشتیبان خودکار روزانه (قانون ۸.۷) — در شروع و سپس هر ۶ ساعت."""
+        from app.modules.backup.service import maybe_auto_backup
+
+        while True:
+            try:
+                result = await asyncio.to_thread(maybe_auto_backup)
+                if result:
+                    logger.info("پشتیبان خودکار ساخته شد: %s", result["filename"])
+            except Exception:  # noqa: BLE001 — خطای پشتیبان نباید سرور را بیندازد
+                logger.exception("ساخت پشتیبان خودکار ناموفق بود")
+            await asyncio.sleep(6 * 3600)
+
+    backup_task = asyncio.create_task(_auto_backup_loop())
     yield
+    backup_task.cancel()
     logger.info("ALEMS خاموش شد")
 
 

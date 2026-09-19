@@ -63,6 +63,33 @@ def create_backup(*, encrypted: bool = False, password: str | None = None) -> di
     }
 
 
+def has_backup_today() -> bool:
+    """آیا امروز (بر اساس پیشوند نام) پشتیبانی ساخته شده است؟"""
+    prefix = datetime.now().strftime("%Y%m%d")
+    return any(backups_dir().glob(f"alems-backup-{prefix}-*.*"))
+
+
+def maybe_auto_backup() -> dict | None:
+    """پشتیبان خودکار — حداکثر یک‌بار در روز (قانون ۸.۷).
+
+    اگر کلید general.auto_backup_enabled در تنظیمات فعال (پیش‌فرض) باشد
+    و امروز پشتیبانی ساخته نشده باشد، یک پشتیبان می‌سازد؛ در غیر این صورت None.
+    """
+    from app.db.session import SessionLocal
+    from app.modules.settings.service import KEY_GENERAL, get_setting
+
+    db = SessionLocal()
+    try:
+        general = get_setting(db, KEY_GENERAL) or {}
+    finally:
+        db.close()
+    if not general.get("auto_backup_enabled", True):
+        return None
+    if has_backup_today():
+        return None
+    return create_backup()
+
+
 def list_backups() -> list[dict]:
     """فهرست پشتیبان‌های موجود."""
     result = []

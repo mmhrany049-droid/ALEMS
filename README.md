@@ -57,8 +57,8 @@ ALEMS/
 │   │   │   └── settings/         #   سیاست‌های قابل تنظیم (بدون hard-code)
 │   │   └── api/v1.py             # مونتاژ روترها — Base URL: /api/v1
 │   ├── alembic/                  # مهاجرت‌ها (migration-first)
-│   ├── samples/sample_book.json  # قالب استاندارد کتاب تست
-│   ├── tests/                    # ۱۰۰ تست (فاز ۰ + دامنه + پذیرش AT-01..27)
+│   ├── samples/                  # قالب استاندارد کتاب: book.schema.json + sample_book_small.json
+│   ├── tests/                    # ۱۹۰+ تست (دامنه + سرویس + پذیرش AT-01..AT-27)
 │   ├── requirements.txt          # وابستگی‌ها (هم‌ارز pyproject)
 │   └── data/ · backups/ · exports/ · imports/   # مسیرهای استاندارد (خارج از Git)
 ├── frontend/
@@ -93,8 +93,36 @@ ALEMS/
 
 ## 🧪 معیارهای پذیرش
 
-- **AT-01 تا AT-27**: پوشش داده شده در `backend/tests/test_api_acceptance.py` (همه پاس)
-- **AT-28 تا AT-31** (UI): Today Hub، RTL کامل با فونت وزیرمتن، تاریخ‌های جلالی، Empty Stateهای راهنما
+- **AT-01 تا AT-27**: پوشش داده شده در `backend/tests/test_api_acceptance.py` + تست‌های تکمیلی فازهای ۲ تا ۵ (`test_knowledge.py`، `test_review_service.py`، `test_planning_api.py`، `test_exam_scoring_api.py`) — همه پاس
+- **AT-28 تا AT-31** (UI): Today Hub (۵ بخش الزامی)، RTL کامل با فونت وزیرمتن، تاریخ‌های جلالی، Empty Stateهای راهنما — تأیید کد و ساخت
+
+---
+
+## 💾 پشتیبان‌گیری و بازگردانی
+
+### پشتیبان دستی
+- از **تنظیمات ← داده‌ها و پشتیبان**: دکمه «پشتیبان جدید» (رمز اختیاری)
+- یا با API:
+```bash
+curl -X POST localhost:8000/api/v1/backup/create -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"encrypted": false}'
+```
+
+### پشتیبان خودکار روزانه (قانون ۸.۷)
+- پس از راه‌اندازی سرور و سپس هر ۶ ساعت بررسی می‌شود؛ **حداکثر یک پشتیبان در روز** ساخته می‌شود
+- از **تنظیمات ← داده‌ها و پشتیبان** قابل خاموش/روشن کردن است (`general.auto_backup_enabled`، پیش‌فرض فعال)
+
+### رمزنگاری
+- اگر هنگام ساخت، رمز بدهید، پشتیبان به‌صورت **ZIP با AES** (pyzipper) ذخیره می‌شود (`alems-backup-*.zip` 🔒)
+
+### بازگردانی
+```bash
+curl -X POST localhost:8000/api/v1/backup/restore -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"backup_id": "alems-backup-20260920-120000.db", "confirm": true}'
+```
+- ⚠️ بازگردانی **جایگزینی کامل** داده‌های فعلی است — بدون `confirm: true` با پیام هشدار فارسی رد می‌شود (قانون ۸.۶)
+- فایل پشتیبان‌ها: `backend/backups/` — برای انتقال بین دستگاه‌ها همین پوشه + `data/alems.db` کافی است
 
 ## 🔧 تنظیمات محیطی (اختیاری)
 

@@ -14,6 +14,7 @@ interface SettingsData {
   scoring_policy: { wrong_penalty: number };
   review_policy: { include_blank: boolean; intervals_days: number[] };
   exam_policy: { max_questions: number };
+  general: { auto_backup_enabled: boolean };
 }
 
 export default function SettingsPage() {
@@ -95,6 +96,16 @@ export default function SettingsPage() {
     onSuccess: (r) => {
       toast.show(`پشتیبان «${r.data.filename}» ساخته شد 💾`);
       void queryClient.invalidateQueries({ queryKey: ['backups'] });
+    },
+    onError: (e) => toast.show(errorMessage(e), 'error'),
+  });
+
+  const toggleAutoBackup = useMutation({
+    mutationFn: (enabled: boolean) =>
+      put('/settings', { general: { auto_backup_enabled: enabled } }),
+    onSuccess: () => {
+      toast.show('تنظیم پشتیبان خودکار ذخیره شد ✅');
+      void queryClient.invalidateQueries({ queryKey: ['settings'] });
     },
     onError: (e) => toast.show(errorMessage(e), 'error'),
   });
@@ -278,7 +289,15 @@ export default function SettingsPage() {
             <h2 className="font-bold text-slate-900 mb-2">پشتیبان‌گیری و بازگردانی</h2>
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
               پشتیبان شامل کل پایگاه داده است؛ برای انتقال بین دستگاه‌ها فایل را دانلود کن.
+              علاوه بر پشتیبان دستی، هر روز حداکثر یک پشتیبان خودکار ساخته می‌شود.
             </p>
+            <label className="flex items-center gap-2 mb-4 text-xs text-slate-600 cursor-pointer">
+              <input type="checkbox" className="accent-primary-600 w-4 h-4"
+                     checked={settingsData?.data?.general?.auto_backup_enabled !== false}
+                     disabled={toggleAutoBackup.isPending}
+                     onChange={(e) => toggleAutoBackup.mutate(e.target.checked)} />
+              پشتیبان خودکار روزانه (پیش‌فرض فعال)
+            </label>
             <div className="flex gap-2 items-center mb-4">
               <input className="input !w-40 text-xs" dir="ltr" type="password"
                      placeholder="رمز (اختیاری)" value={backupPassword}
