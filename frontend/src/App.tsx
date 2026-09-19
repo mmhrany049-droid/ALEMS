@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import { Spinner } from './components/ui';
 import { useAuth } from './hooks/useAuth';
 import AuthPage from './features/auth/AuthPage';
+import OnboardingPage from './features/onboarding/OnboardingPage';
 import TodayPage from './features/today/TodayPage';
 import StudyPage from './features/study/StudyPage';
 import TestsPage from './features/tests/TestsPage';
@@ -14,7 +15,7 @@ import AnalyticsPage from './features/analytics/AnalyticsPage';
 import SettingsPage from './features/settings/SettingsPage';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return <Spinner label="در حال آماده‌سازی ALEMS..." />;
@@ -25,6 +26,16 @@ export default function App() {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
+      </Routes>
+    );
+  }
+
+  // سند 8.6: کاربر بدون پروفایل کامل → هدایت به تکمیل پروفایل قبل از بخش‌های اصلی
+  if (profile && !profile.is_complete) {
+    return (
+      <Routes>
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
     );
   }

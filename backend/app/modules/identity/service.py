@@ -5,12 +5,12 @@ import uuid
 from datetime import datetime
 
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.db.session import get_db
-from app.modules.identity.models import ROLES, SessionToken, User
+from app.modules.identity.models import SessionToken, User
 from app.modules.identity.schemas import LoginIn, RegisterIn, TokenOut, UserOut
 from app.shared.exceptions import ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError
 
@@ -20,14 +20,35 @@ def get_user_by_username(db: Session, username: str) -> User | None:
 
 
 def create_user(db: Session, payload: RegisterIn) -> User:
+    """ساخت کاربر جدید (Permission Module):
+    - نخستین کاربر سیستم = «مدیر» (سند 01 §1.5: مدیر سیستم — تنظیمات و پشتیبان‌گیری)
+    - کاربران بعدی = دانش‌آموز (پیش‌فرض)
+    - اگر full_name داده شود، پروفایل اولیه ساخته می‌شود (ناقص تا تکمیل پایه/رشته).
+    """
     from app.modules.identity.domain import validate_password, validate_username
 
     username = validate_username(payload.username)
     validate_password(payload.password)
     if get_user_by_username(db, username) is not None:
         raise ConflictError("این نام کاربری قبلاً ثبت شده است. نام دیگری انتخاب کنید.")
-    user = User(username=username, password_hash=hash_password(payload.password), role="student")
+
+    is_first_user = (db.scalar(select(func.count()).select_from(User)) or 0) == 0
+    user = User(
+        username=username,
+        password_hash=hash_password(payload.password),
+        role="admin" if is_first_user else "student",
+    )
     db.add(user)
+    db.flush()
+    if payload.full_name:
+        from app.modules.student.models import StudentProfile
+
+        db.add(StudentProfile(
+            user_id=user.id,
+            full_name=payload.full_name,
+            grade="",   # ناقص — تا کاربر پایه/رشته را در آغازکار تکمیل کند
+            field="",
+        ))
     db.commit()
     db.refresh(user)
     return user
@@ -109,7 +130,7 @@ def current_user(
 
 
 def require_admin(user: User = Depends(current_user)) -> User:
-    """دسترسی فقط برای مدیر."""
-    if user.role not in ROLES or user.role != "admin":
+    """دسترسی فقط برای مدیر (Permission Module)."""
+    if user.role != "admin":
         raise ForbiddenError("این عملیات فقط برای مدیر سیستم مجاز است.")
     return user
