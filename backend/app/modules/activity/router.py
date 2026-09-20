@@ -1,16 +1,137 @@
-"""Activity & Test Engine — FastAPI router (mounted under /api/v1 by app.api.v1).
+"""Activity & Test Engine — FastAPI router (doc 06 §Tests).
 
-Test Record append-only، Test Engine (range/parity/timed)، time tracking، past import با NOT_ENTERED، تیک‌ها، دفترچه خطا (doc 09)
-
-مسیرها (doc 06):
-#   POST /test-sessions
-#   POST /test-sessions/{id}/records
-#   POST /test-sessions/{id}/finish
-#   POST /tests/past-import
-#   GET /test-engine/preview
-
-فیلد می‌شود در: فاز ۳
+مسیرها:
+- POST /test-sessions                      create session (mode timed/untimed)
+- GET  /test-sessions                      تاریخچه جلسات
+- GET  /test-sessions/{id}                 جزئیات + attempts (append-only) + aggregate موضوع
+- POST /test-sessions/{id}/records         add records (ثبت تست سریع)
+- POST /test-sessions/{id}/finish          scoring — ایدمپوتنت (V2-T02)
+- POST /tests/past-import                  نتایج قدیمی با not_entered (V2-T03)
+- GET  /test-engine/preview?resource_id&from&to&parity   preview انتخاب بازه
+- GET  /tests/error-notebook               دفترچه خطا (پایه)
+- PUT  /tests/error-notebook/{note_id}     نوع اشتباه + یادداشت
 """
-from fastapi import APIRouter
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.exceptions import HTTPException
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.modules.activity import service
+from app.modules.activity.domain import PARITIES
+from app.modules.activity.schemas import (
+    ErrorNoteUpdate,
+    FinishIn,
+    PastImportIn,
+    RecordsIn,
+    SessionCreate,
+)
+from app.modules.student.models import Student
+from app.shared.deps import get_current_student
+from app.shared.envelope import ok
 
 router = APIRouter(tags=["activity"])
+
+
+@router.post("/test-sessions")
+def create_session(
+    body: SessionCreate,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    result = service.create_session(db, student, body)
+    db.commit()
+    return ok(data=result)
+
+
+@router.get("/test-sessions")
+def list_sessions(
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    return ok(data={"items": service.list_sessions(db, student)})
+
+
+@router.get("/test-sessions/{session_id}")
+def get_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    return ok(data=service.get_session(db, student, session_id))
+
+
+@router.post("/test-sessions/{session_id}/records")
+def add_records(
+    session_id: str,
+    body: RecordsIn,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    result = service.add_records(db, student, session_id, body)
+    db.commit()
+    return ok(data=result)
+
+
+@router.post("/test-sessions/{session_id}/finish")
+def finish_session(
+    session_id: str,
+    body: FinishIn | None = None,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    result = service.finish_session(db, student, session_id, body or FinishIn())
+    db.commit()
+    return ok(data=result)
+
+
+@router.post("/tests/past-import")
+def past_import(
+    body: PastImportIn,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    result = service.past_import(db, student, body)
+    db.commit()
+    return ok(data=result)
+
+
+@router.get("/test-engine/preview")
+def preview(
+    resource_id: str = Query(...),
+    topic_ids: str | None = Query(default=None, description="comma-separated"),
+    from_number: int | None = Query(default=None, ge=1, alias="from"),
+    to_number: int | None = Query(default=None, ge=1, alias="to"),
+    parity: str = Query(default="any"),
+    count: int | None = Query(default=None, ge=1),
+    difficulty: int | None = Query(default=None, ge=1, le=5),
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    if parity not in PARITIES:
+        raise HTTPException(status_code=422, detail="parity باید یکی از any/odd/even باشد.")
+    ids = [t.strip() for t in (topic_ids or "").split(",") if t.strip()]
+    return ok(
+        data=service.preview(db, student, resource_id, ids, from_number, to_number, parity, count, difficulty)
+    )
+
+
+@router.get("/tests/error-notebook")
+def error_notebook(
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    return ok(data={"items": service.list_error_notes(db, student)})
+
+
+@router.put("/tests/error-notebook/{note_id}")
+def update_error_note(
+    note_id: str,
+    body: ErrorNoteUpdate,
+    db: Session = Depends(get_db),
+    student: Student = Depends(get_current_student),
+):
+    note = service.update_error_note(db, student, note_id, body)
+    db.commit()
+    return ok(data=note)

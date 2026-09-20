@@ -13,7 +13,7 @@
 | 0 | Foundation + Motion Shell | ✅ انجام شد |
 | 1 | Identity & Student (onboarding، check-in، taught) | ✅ انجام شد |
 | 2 | Books TOC-only (import فهرست، tree، block_type) | ✅ انجام شد |
-| 3 | Test Engine (session، range/parity، past import) | ⬜ |
+| 3 | Test Engine (session، range/parity، past import) | ✅ انجام شد |
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ⬜ |
 | 5 | Planning & Today (capacity، generate-week، override) | ⬜ |
 | 6 | Exam & Analytics (exam center، متریک‌ها، export) | ⬜ |
@@ -96,7 +96,7 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — 66 تست: envelope، تقویم جلالی، health، auth، student، taught، books/TOC-only
+cd backend && .venv/bin/python -m pytest   # pytest — 86 تست: envelope، تقویم جلالی، health، auth، student، taught، books/TOC-only، test engine
 cd frontend && npm run build               # type-check + build
 ```
 
@@ -142,6 +142,22 @@ cd frontend && npm run build               # type-check + build
 - [x] Frontend: صفحه Import (drag/drop JSON + paste + پیش‌نمایش شمارش + نمونه)، درخت کتاب در Study با badge، EmptyState با CTA
 - [x] Migration Alembic 0003 (resources/topics/questions/answer_keys + ایندکس حیاتی topics(resource_id, block_type))
 - [x] 66/66 pytest سبز · tsc + vite build سبز · آزمون زنده ۱۰/۱۰ از طریق پروکسی 5173
+
+## معیار پذیرش فاز ۳ (خود-بررسی)
+
+- [x] `POST /test-sessions` با range + parity (any/odd/even) + count + difficulty — **V2-T01: range+odd فقط فردها**
+- [x] اگر بعد از فیلتر سوالی نماند → ۴۲۲ فارسی: «فقط X سوال با این شرایط وجود دارد.» (doc 09 §9.2)
+- [x] timed/untimed — timed بدون planned_duration رد می‌شود
+- [x] `POST /test-sessions/{id}/records` — ثبت سریع؛ **history append-only (V2-T05)**: تکرار سوال ردیف جدید می‌سازد، scoring آخرین ردیف را می‌بیند، snapshots (کلید/نسخه/شماره/موضوع) روی attempt
+- [x] `POST /test-sessions/{id}/finish` — **ایدمپوتنت (V2-T02)**: بار دوم همان snapshot بدون رویداد؛ records بعد از finish → ۴۰۹ «تاریخچه قفل است»
+- [x] درصد کنکوری **(C − k·W)/T×100** با k=0.33 از settings + درصد بدون منفی C/T×100؛ T=0 → null؛ **درصد منفی نمایش داده می‌شود** — نمونه استاندارد V2-T04: T=10، C=5، W=3 → 40.1 و 50.0
+- [x] status: answered|unanswered|**not_entered** — **V2-T03: past import با not_entered**؛ تکمیل بعدی «همان attempt» را answered می‌کند (نه duplicate) و درصد به‌روز می‌شود
+- [x] past import سوال/کلید نبوده را می‌سازد (answer_keys نسخه‌دار append-only) — کتاب TOC-only هم پوشش داده می‌شود
+- [x] time tracking (doc 09 §9.4): duration per attempt + aggregate per topic (میانگین)؛ untimed → مدت بعد از finish پرسیده می‌شود (پیش‌فرض از تایمر UI)
+- [x] دفترچه خطا پایه: هر غلط خودکار یک ردیف + `PUT` نوع اشتباه (بی‌دقتی/مفهومی/روش/فراموشی/سایر) و یادداشت
+- [x] Frontend: تب‌های آزمون جدید (preview زنده بازه با شماره‌ها) / تاریخچه (+ادامه جلسه ناتمام) / نتایج قدیمی (ردیف‌ساز) / دفترچه خطا؛ runner با تایمر و ثبت تک‌کلیکی درست/غلط/نزده؛ ScoreCard با ۴ شمارش **جدا** (Coverage≠Accuracy≠Volume)
+- [x] Migration Alembic 0004 (test_sessions/attempt_results/error_notes + ایندکس حیاتی attempts(student_id, solved_at)؛ FKها SET NULL تا تاریخچه با حذف کتاب نرود)
+- [x] 86/86 pytest سبز · tsc + vite build سبز · آزمون زنده ۱۱/۱۱ از طریق پروکسی 5173
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 
