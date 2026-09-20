@@ -1,0 +1,81 @@
+/* ============================================================================
+   ALEMS 2.0 — Design Tokens (doc 07.3, اجباری تعریف در کد)
+   Semantic colors (doc 07.2): سبز درست، قرمز غلط، آبی مرور، کهربایی مهم
+   radius.md=12  radius.lg=16   space 4/8/12/16/24/32
+   font body 14–16  title 18–24  display 28–32
+   motion.fast 180  normal 280  slow 400 (ms)
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- color tokens (required set) -------------------------------------- */
+  --color-bg: #f4f6fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1f8;
+  --color-border: #e3e8f2;
+  --color-primary: #2563eb;
+  --color-primary-soft: #dbeafe;
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-warning: #d97706; /* کهربایی — important */
+  --color-warning-soft: #fef3c7;
+  --color-review: #2563eb; /* آبی مرور */
+  --color-review-soft: #dbeafe;
+  --color-text: #10141f;
+  --color-text-muted: #5b6472;
+
+  /* --- radius ------------------------------------------------------------ */
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* --- spacing scale (doc 07.3) ----------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* --- typography -------------------------------------------------------- */
+  --font-body-sm: 14px;
+  --font-body: 15px;
+  --font-body-lg: 16px;
+  --font-title-sm: 18px;
+  --font-title: 22px;
+  --font-title-lg: 24px;
+  --font-display: 28px;
+  --font-display-lg: 32px;
+
+  /* --- motion (doc 07.3) ------------------------------------------------- */
+  --motion-fast: 180ms;
+  --motion-normal: 280ms;
+  --motion-slow: 400ms;
+
+  --shadow-soft: 0 1px 2px rgba(16, 20, 31, 0.04), 0 8px 24px rgba(16, 20, 31, 0.06);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-bg: #0d1017;
+  --color-surface: #151a24;
+  --color-surface-2: #1d2431;
+  --color-border: #27303f;
+  --color-primary: #4f83f7;
+  --color-primary-soft: #1e3a5f;
+  --color-success: #34d399;
+  --color-success-soft: #0f3d2e;
+  --color-danger: #f87171;
+  --color-danger-soft: #4c1d24;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #42300f;
+  --color-review: #60a5fa;
+  --color-review-soft: #1e3a5f;
+  --color-text: #eef1f7;
+  --color-text-muted: #9aa4b5;
+
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px rgba(0, 0, 0, 0.45);
+}

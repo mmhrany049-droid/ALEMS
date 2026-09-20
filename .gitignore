@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# Data (SQLite + files) — never commit user data
+backend/data/*
+backend/backups/*
+backend/exports/*
+backend/imports/*
+!backend/data/.gitkeep
+!backend/backups/.gitkeep
+!backend/exports/.gitkeep
+!backend/imports/.gitkeep
+
+# env
+.env
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/

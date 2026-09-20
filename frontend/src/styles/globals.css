@@ -1,0 +1,53 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --------------------------------------------------------------------------
+   Base — Vazirmatn (doc 07.2), RTL, soft cards, high contrast main text
+   -------------------------------------------------------------------------- */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  font-size: var(--font-body);
+  line-height: 1.7;
+  transition: background-color var(--motion-normal) ease, color var(--motion-normal) ease;
+}
+
+::selection {
+  background: var(--color-primary-soft);
+}
+
+/* thin, theme-aware scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion (doc 07.4 — prefers-reduced-motion: fade only, no movement)
+   Framer Motion additionally gets reducedMotion="user" in <MotionConfig>.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

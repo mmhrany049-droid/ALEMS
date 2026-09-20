@@ -1,0 +1,7 @@
+"""Report — application services / use-cases (doc 03 §3.1).
+
+گزارش روزانه/هفتگی/ماهانه (doc 12 §12.5)
+
+رویدادهای دامنه از app.core.events emit می‌شوند (doc 03 §3.4).
+فیلد می‌شود در: فاز ۶
+"""

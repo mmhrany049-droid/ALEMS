@@ -1,0 +1,8 @@
+"""Academic Knowledge (Books & Import) — SQLAlchemy 2 models.
+
+درخت دروس، منابع و کتاب، Import TOC-only و کامل، سوال + answer key نسخه‌دار، سختی/تگ/اهمیت، block_type (doc 09)
+
+فیلد می‌شود در: فاز ۲
+PK: UUID رشته‌ای (doc 05). نرمال‌سازی و ایندکس‌های حیاتی طبق doc 05.
+"""
+from app.db.base import Base  # noqa: F401 — tables register here in the phase above
