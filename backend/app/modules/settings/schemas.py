@@ -1,6 +1,14 @@
-"""Settings — Pydantic v2 schemas (request/response).
+"""Settings — Pydantic v2 schemas (doc 06: GET/PUT /settings)."""
+from __future__ import annotations
 
-سیاست‌ها بدون hard-code: k جریمه کنکور، چرخه مرور [1,3,7,14]، سقف روزانه مرور، سکه (OD1) و ...
+from pydantic import BaseModel, ConfigDict
 
-فیلد می‌شود در: فاز ۱
-"""
+
+class SettingsUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    review_intervals: list[int] | None = None
+    include_blank_in_review: bool | None = None
+    max_daily_review: int | None = None
+    min_cluster: int | None = None
+    konkurs_penalty_k: float | None = None

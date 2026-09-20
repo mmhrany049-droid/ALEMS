@@ -30,6 +30,7 @@ from app.core.versioning import (
     schema_version_from_alembic,
 )
 from app.db.session import get_engine, session_scope
+from app.modules.review.service import register_event_consumers
 from app.shared.envelope import ok, register_envelope_handlers
 
 logger = logging.getLogger("alems")
@@ -50,6 +51,8 @@ async def lifespan(app: FastAPI):
     ensure_directories(settings)
     with session_scope() as db:
         init_meta(db)
+    # doc 03 §3.4 — مصرف‌کنندگان رویداد: test finish/past → review rebuild + learning states
+    register_event_consumers()
     logger.info(
         "%s نسخه %s راه‌اندازی شد — backend :%d | DB: %s",
         settings.app_name,

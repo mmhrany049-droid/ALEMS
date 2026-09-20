@@ -14,7 +14,7 @@
 | 1 | Identity & Student (onboarding، check-in، taught) | ✅ انجام شد |
 | 2 | Books TOC-only (import فهرست، tree، block_type) | ✅ انجام شد |
 | 3 | Test Engine (session، range/parity، past import) | ✅ انجام شد |
-| 4 | Review & Learning (صف، spaced، cluster، learning state) | ⬜ |
+| 4 | Review & Learning (صف، spaced، cluster، learning state) | ✅ انجام شد |
 | 5 | Planning & Today (capacity، generate-week، override) | ⬜ |
 | 6 | Exam & Analytics (exam center، متریک‌ها، export) | ⬜ |
 | 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ⬜ |
@@ -158,6 +158,20 @@ cd frontend && npm run build               # type-check + build
 - [x] Frontend: تب‌های آزمون جدید (preview زنده بازه با شماره‌ها) / تاریخچه (+ادامه جلسه ناتمام) / نتایج قدیمی (ردیف‌ساز) / دفترچه خطا؛ runner با تایمر و ثبت تک‌کلیکی درست/غلط/نزده؛ ScoreCard با ۴ شمارش **جدا** (Coverage≠Accuracy≠Volume)
 - [x] Migration Alembic 0004 (test_sessions/attempt_results/error_notes + ایندکس حیاتی attempts(student_id, solved_at)؛ FKها SET NULL تا تاریخچه با حذف کتاب نرود)
 - [x] 86/86 pytest سبز · tsc + vite build سبز · آزمون زنده ۱۱/۱۱ از طریق پروکسی 5173
+
+## معیار پذیرش فاز ۴ (خود-بررسی)
+
+- [x] صف مرور از **غلط‌ها + تیک‌ها** (review/important/hard)؛ «نزده» فقط اگر `include_blank_in_review` روشن باشد (doc 10 §10.1، doc 08 §8.4)
+- [x] چرخه **۱-۳-۷-۱۴ از settings** (قابل تغییر از `PUT /settings` — فوراً مؤثر)؛ هر complete → برنامه‌ریزی بعدی؛ پایان چرخه → **absorbed** (بازگشت فقط با غلط جدید)
+- [x] **critical اگر غلط ≥ ۲** روی همان سوال (V2-R03) · postpone → تاریخ جابه‌جا، status=pending (V2-R04)
+- [x] **rebuild خودکار با event** بعد از finish تست/past import (publish بعد از commit — مصرف‌کننده session خودش را دارد)؛ `POST /reviews/rebuild` دستی هم idempotent بدون duplicate
+- [x] **cluster suggestion** (doc 10 §10.3): خوشه‌های ≥ `min_cluster` با هم، سقف `max_daily_review`، اولویت critical و overdue
+- [x] **learning_states per topic** (doc 10 §10.4): coverage/accuracy/retention/recency/repeated_error/exam_readiness/confidence — همه فرمول‌ها در `review/domain.py` خالص و unit-test شده (بدون hard-code پراکنده)
+- [x] weakness **ترکیبی** است نه تک‌سیگنال (doc 10 §10.5): دقت پایین ∧ خطای تکراری بالا ∧ پوشش ناکافی ∧ اطمینان کافی
+- [x] تیک‌ها: `GET/PUT /questions/{id}/marks` + رویداد `question_marks.changed` + ورود فوری به صف (V2-R01)
+- [x] Frontend: صفحه مرور با **stagger animation** صف (doc 07.4 #2)، کارت‌های cluster و وضعیت یادگیری با بارهای پیشرفت؛ toggle تیک‌ها در SessionRunner؛ کارت تنظیمات مرور/جریمه در Settings
+- [x] Migration Alembic 0005 (question_marks/review_queue/learning_states + ایندکس‌های حیاتی doc 05)
+- [x] 107/107 pytest سبز · vite build سبز · آزمون زنده ۲۹/۲۹ روی سرور واقعی
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

@@ -6,8 +6,9 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../lib/api'
-import type { FinishOut, SessionCreateOut, SessionQuestion } from '../../lib/schemas'
+import type { FinishOut, MarksOut, ReviewMarks, SessionCreateOut, SessionQuestion } from '../../lib/schemas'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Spinner } from '../../components/Spinner'
@@ -38,6 +39,47 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
   const [askDuration, setAskDuration] = useState(false)
   const [manualMin, setManualMin] = useState('')
   const [finished, setFinished] = useState<FinishOut | null>(null)
+
+  // تیک‌ها (doc 04 Question Marking) — review/important/hard → صف مرور (doc 10 §10.1)
+  const qc = useQueryClient()
+  const [qmarks, setQmarks] = useState<Record<string, ReviewMarks>>({})
+  useEffect(() => {
+    let alive = true
+    const ids = questions.map((q) => q.question_id).filter((x): x is string => Boolean(x))
+    void Promise.all(
+      ids.map((id) =>
+        api
+          .get<MarksOut>(`/questions/${id}/marks`)
+          .then((m) => ({ id, review: m.review, important: m.important, hard: m.hard }))
+          .catch(() => null),
+      ),
+    ).then((rows) => {
+      if (!alive) return
+      const next: Record<string, ReviewMarks> = {}
+      for (const r of rows) if (r) next[r.id] = { review: r.review, important: r.important, hard: r.hard }
+      setQmarks(next)
+    })
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const toggleMark = async (q: SessionQuestion, field: keyof ReviewMarks) => {
+    if (!q.question_id) return
+    const qid = q.question_id
+    const cur = qmarks[qid] ?? { review: false, important: false, hard: false }
+    const next = { ...cur, [field]: !cur[field] }
+    setQmarks((m) => ({ ...m, [qid]: next }))
+    try {
+      const saved = await api.put<MarksOut>(`/questions/${qid}/marks`, { [field]: next[field] })
+      setQmarks((m) => ({ ...m, [qid]: { review: saved.review, important: saved.important, hard: saved.hard } }))
+      void qc.invalidateQueries({ queryKey: ['reviews'] })
+    } catch {
+      setQmarks((m) => ({ ...m, [qid]: cur }))
+      setError('تیک ثبت نشد؛ دوباره تلاش کن.')
+    }
+  }
 
   useEffect(() => {
     if (finished) return
@@ -185,6 +227,34 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
                   {q.difficulty != null && (
                     <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted">
                       سختی {faDigits(q.difficulty)}
+                    </span>
+                  )}
+                  {q.question_id && (
+                    <span className="flex items-center gap-1" title="تیک‌ها — وارد صف مرور می‌شوند">
+                      {(
+                        [
+                          { key: 'review', label: 'مرور', on: 'border-review/40 bg-review-soft text-review' },
+                          { key: 'important', label: 'مهم', on: 'border-primary/40 bg-primary-soft text-primary' },
+                          { key: 'hard', label: 'سخت', on: 'border-warning/40 bg-warning-soft text-warning' },
+                        ] as const
+                      ).map((mk) => {
+                        const on = q.question_id ? (qmarks[q.question_id]?.[mk.key] ?? false) : false
+                        return (
+                          <button
+                            key={mk.key}
+                            type="button"
+                            onClick={() => void toggleMark(q, mk.key)}
+                            aria-pressed={on}
+                            aria-label={`تیک ${mk.label}`}
+                            className={[
+                              'rounded-md border px-1.5 py-0.5 text-[11px] transition-colors',
+                              on ? mk.on : 'border-transparent text-muted hover:bg-surface-2',
+                            ].join(' ')}
+                          >
+                            {mk.label}
+                          </button>
+                        )
+                      })}
                     </span>
                   )}
                 </div>

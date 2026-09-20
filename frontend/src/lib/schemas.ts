@@ -246,3 +246,110 @@ export interface ErrorNoteOut {
   note: string | null
   created_at: string
 }
+
+// --- Phase 4 — Review & Learning & Settings (doc 10، doc 06) -------------------
+
+export interface AppSettings {
+  review_intervals: number[]
+  include_blank_in_review: boolean
+  max_daily_review: number
+  min_cluster: number
+  konkurs_penalty_k: number
+}
+
+export interface ReviewMarks {
+  review: boolean
+  important: boolean
+  hard: boolean
+}
+
+export interface MarksOut extends ReviewMarks {
+  question_id: string
+  updated_at: string | null
+}
+
+export type ReviewSource = 'wrong' | 'blank' | 'mark_review' | 'mark_important' | 'mark_hard'
+
+export interface ReviewItemOut {
+  id: string
+  question_id: string
+  number: number | null
+  topic_id: string | null
+  topic_title: string | null
+  book_title: string | null
+  source: ReviewSource
+  source_fa: string
+  status: 'pending' | 'scheduled' | 'absorbed'
+  critical: boolean
+  wrong_count: number
+  review_count: number
+  cycle_index: number
+  cycle_length: number
+  next_interval_days: number | null
+  scheduled_date: string | null
+  scheduled_date_jalali: string | null
+  overdue_days: number
+  your_answer: string | null
+  correct_answer: string | null
+  marks: ReviewMarks
+}
+
+export interface ReviewQueueOut {
+  items: ReviewItemOut[]
+  due_count: number
+  upcoming_count: number
+  absorbed_count: number
+  intervals: number[]
+  today_jalali: string
+}
+
+export interface RebuildOut {
+  added: number
+  updated: number
+  reopened: number
+  active: number
+  learning_states: number
+  intervals: number[]
+}
+
+export interface ClusterOut {
+  topic_id: string | null
+  topic_title: string
+  book_title: string | null
+  size: number
+  critical_count: number
+  suggested_count: number
+}
+
+export interface ClusterSuggestionOut {
+  suggested: ReviewItemOut[]
+  suggested_count: number
+  clusters: ClusterOut[]
+  due_count: number
+  budget: number
+  min_cluster: number
+}
+
+export interface LearningStateOut {
+  id: string
+  topic_id: string
+  topic_title: string
+  book_title: string | null
+  coverage: number
+  accuracy: number
+  retention_est: number
+  recency_score: number
+  repeated_error_score: number
+  exam_readiness: number
+  confidence: number
+  weakness: boolean
+  total_questions: number
+  attempted_questions: number
+  correct_count: number
+  wrong_count: number
+  updated_at: string
+}
+
+export interface LearningStatesOut {
+  items: LearningStateOut[]
+}

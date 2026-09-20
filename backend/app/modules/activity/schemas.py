@@ -82,3 +82,13 @@ class ErrorNoteUpdate(BaseModel):
 
     error_type: ErrorType | None = None
     note: str | None = Field(default=None, max_length=1000)
+
+
+class MarkUpdate(BaseModel):
+    """تیک‌ها (doc 04 Question Marking) — review/important/hard."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    review: bool | None = None
+    important: bool | None = None
+    hard: bool | None = None

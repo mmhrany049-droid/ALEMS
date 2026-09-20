@@ -17,12 +17,12 @@ import datetime as dt
 from fastapi.exceptions import HTTPException
 from sqlalchemy import select
 
-from app.core.events import TEST_RECORDS_CREATED, Event, event_bus
+from app.core.events import QUESTION_MARKS_CHANGED, TEST_RECORDS_CREATED, Event, event_bus
 from app.core.versioning import get_meta_value
 from app.modules.academic.models import AnswerKey, Question, Resource, Topic
 from app.modules.academic.service import children_map_for
 from app.modules.activity import domain
-from app.modules.activity.models import AttemptResult, ErrorNote, TestSession
+from app.modules.activity.models import AttemptResult, ErrorNote, QuestionMark, TestSession
 from app.modules.student.models import Student
 
 MSG_SESSION_NOT_FOUND = "جلسه پیدا نشد."
@@ -471,20 +471,9 @@ def finish_session(db, student: Student, session_id: str, payload) -> dict:
     session.finished_at = _utcnow()
     db.flush()
 
-    event_bus.publish(
-        Event(
-            TEST_RECORDS_CREATED,
-            {
-                "student_id": student.id,
-                "session_id": session.id,
-                "finished": True,
-                "correct": sc["correct_count"],
-                "wrong": sc["wrong_count"],
-                "percent_konkur": sc["percent_konkur"],
-            },
-        )
-    )
-    # TODO فاز ۴: learning state update به‌عنوان مصرف‌کننده همین رویداد (doc 09 §9.2)
+    # رویداد finish در router و «بعد از commit» publish می‌شود تا مصرف‌کننده
+    # (review rebuild — فاز ۴) داده commitشده را ببیند (doc 09 §9.2: finish →
+    # scoring + events + learning state update).
 
     return {
         "session": _session_out(session),
@@ -620,12 +609,7 @@ def past_import(db, student: Student, payload) -> dict:
         session.actual_duration = _sum_durations(attempts)
     db.flush()
 
-    event_bus.publish(
-        Event(
-            TEST_RECORDS_CREATED,
-            {"student_id": student.id, "session_id": session.id, "count": imported + updated, "past": True},
-        )
-    )
+    # رویداد past در router بعد از commit publish می‌شود (دید مصرف‌کننده).
     return {
         "session": _session_out(session),
         "created_session": created_session,
@@ -707,3 +691,77 @@ def _note_out(n: ErrorNote) -> dict:
         "note": n.note,
         "created_at": _iso(n.created_at),
     }
+
+
+# --- تیک‌ها (doc 04 Question Marking، doc 08 §8.4، doc 10 §10.1) -------------------
+
+MSG_QUESTION_NOT_FOUND = "سوال پیدا نشد."
+
+
+def _owned_question(db, student: Student, question_id: str) -> Question:
+    q = db.execute(
+        select(Question)
+        .join(Topic, Topic.id == Question.topic_id)
+        .join(Resource, Resource.id == Topic.resource_id)
+        .where(Question.id == question_id, Resource.student_id == student.id)
+    ).scalar_one_or_none()
+    if q is None:
+        raise HTTPException(status_code=404, detail=MSG_QUESTION_NOT_FOUND)
+    return q
+
+
+def _marks_out(mark, question_id: str) -> dict:
+    return {
+        "question_id": question_id,
+        "review": bool(mark.review) if mark else False,
+        "important": bool(mark.important) if mark else False,
+        "hard": bool(mark.hard) if mark else False,
+        "updated_at": _iso(mark.updated_at) if mark else None,
+    }
+
+
+def get_marks(db, student: Student, question_id: str) -> dict:
+    _owned_question(db, student, question_id)
+    mark = db.execute(
+        select(QuestionMark).where(
+            QuestionMark.student_id == student.id, QuestionMark.question_id == question_id
+        )
+    ).scalar_one_or_none()
+    return _marks_out(mark, question_id)
+
+
+def put_marks(db, student: Student, question_id: str, payload) -> dict:
+    """تیک review/important/hard → ورود به صف مرور (doc 10 §10.1) + رویداد."""
+    from app.modules.review.service import sync_marks_into_queue  # service→service (doc 03 §3.1)
+
+    _owned_question(db, student, question_id)
+    mark = db.execute(
+        select(QuestionMark).where(
+            QuestionMark.student_id == student.id, QuestionMark.question_id == question_id
+        )
+    ).scalar_one_or_none()
+    if mark is None:
+        mark = QuestionMark(student_id=student.id, question_id=question_id)
+        db.add(mark)
+    data = payload.model_dump(exclude_unset=True)
+    for f in ("review", "important", "hard"):
+        if f in data and data[f] is not None:
+            setattr(mark, f, bool(data[f]))
+    mark.updated_at = _utcnow()
+    db.flush()
+
+    event_bus.publish(
+        Event(
+            QUESTION_MARKS_CHANGED,
+            {
+                "student_id": student.id,
+                "question_id": question_id,
+                "review": mark.review,
+                "important": mark.important,
+                "hard": mark.hard,
+            },
+        )
+    )
+    sync_marks_into_queue(db, student, question_id, mark)
+    db.flush()
+    return _marks_out(mark, question_id)

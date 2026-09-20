@@ -1,6 +1,10 @@
-"""Review & Learning — Pydantic v2 schemas (request/response).
+"""Review & Learning — Pydantic v2 schemas (doc 06 §Review)."""
+from __future__ import annotations
 
-صف مرور، چرخه ۱-۳-۷-۱۴، خوشه‌ای/تصادفی، Learning State چندبعدی، Weakness، Intervention (doc 10)
+from pydantic import BaseModel, ConfigDict, Field
 
-فیلد می‌شود در: فاز ۴
-"""
+
+class PostponeIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    days: int = Field(default=1, ge=1, le=30)

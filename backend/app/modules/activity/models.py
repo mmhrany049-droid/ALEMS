@@ -23,6 +23,7 @@ import datetime as dt
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -31,6 +32,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -157,4 +159,29 @@ class ErrorNote(Base):
     error_type: Mapped[str | None] = mapped_column(String(20))
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now, onupdate=_now)
+
+
+class QuestionMark(Base):
+    """تیک‌ها (doc 04 Question Marking, doc 08 §8.4) — review/important/hard.
+
+    ورودی صف مرور: marks ∈ {review, important, hard} (doc 10 §10.1).
+    یکتایی (student_id, question_id) — upsert، نه duplicate.
+    """
+
+    __tablename__ = "question_marks"
+    __table_args__ = (
+        UniqueConstraint("student_id", "question_id", name="uq_question_marks_student_id_question_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    student_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("students.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    question_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("questions.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    important: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    hard: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now, onupdate=_now)
