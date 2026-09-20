@@ -11,7 +11,7 @@
 | فاز | نام | وضعیت |
 |-----|-----|--------|
 | 0 | Foundation + Motion Shell | ✅ انجام شد |
-| 1 | Identity & Student (onboarding، check-in، taught) | ⬜ |
+| 1 | Identity & Student (onboarding، check-in، taught) | ✅ انجام شد |
 | 2 | Books TOC-only (import فهرست، tree، block_type) | ⬜ |
 | 3 | Test Engine (session، range/parity، past import) | ⬜ |
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ⬜ |
@@ -44,6 +44,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
 
 # Terminal 2 — Frontend
@@ -95,7 +96,7 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — envelope، تقویم جلالی، health
+cd backend && .venv/bin/python -m pytest   # pytest — 49 تست: envelope، تقویم جلالی، health، auth، student، taught
 cd frontend && npm run build               # type-check + build
 ```
 
@@ -113,6 +114,19 @@ cd frontend && npm run build               # type-check + build
 - [x] Error envelope یکسان با پیام فارسی
 - [x] requirements.txt کامل و نسخه‌دار
 - [x] اسکلت Today: سلام + کارت ظرفیت + کارهای امروز (mock) + بلوک مرور + cascade
+
+## معیار پذیرش فاز ۱ (خود-بررسی)
+
+- [x] ثبت‌نام و ورود کامل (bcrypt + JWT HS256؛ stateless؛ logout = client token را رها می‌کند)
+- [x] پروفایل دانش‌آموز: پایه / رشته / هدف کنکور (PUT /students/me)
+- [x] check-in روزانه (energy/focus/motivation/stress/fatigue، 1..5) — **دو بار در یک روز = upsert، نه duplicate** (date = روز تهران)
+- [x] GET /students/me/state — today / last / data_days + تاریخ شمسی
+- [x] Taught topics GET/PUT (آبشاری ساده؛ cascade برای فاز ۲ آماده) — **بدون mock topic id**؛ UI آماده + API واقعی
+- [x] توکن در client: memory + localStorage (`alems.token`)؛ 401 → پاک‌سازی خودکار
+- [x] پیام خطا فارسی (401/409/422/404 + خطاهای فرم)
+- [x] Frontend: صفحه Auth با motion، Onboarding ۴ مرحله‌ای، کارت check-in روی Today، پنل taught روی Study، خروج از Settings
+- [x] Migration Alembic 0002 (users/students/checkins/taught_topics) — فقط از طریق Alembic
+- [x] 49/49 pytest سبز · tsc + vite build سبز
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

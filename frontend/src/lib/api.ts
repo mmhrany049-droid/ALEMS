@@ -1,10 +1,13 @@
 /**
  * API client — envelope from doc 06:
  * { success, data, error: {code, message, details} | null, meta }
- * Persia-friendly: surfaces the backend's Persian `error.message`.
+ * Persian-friendly: surfaces the backend's Persian `error.message`.
  *
  * Base is /api/v1 via the Vite proxy → http://127.0.0.1:8010 (doc 03 §3.2).
+ * Auth: Bearer token from lib/auth (phase 1).
  */
+import { clearToken, getStoredToken } from './auth'
+
 export interface Envelope<T> {
   success: boolean
   data: T | null
@@ -25,14 +28,25 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredToken()
   const res = await fetch(`/api/v1${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
     ...init,
   })
   const body = (await res.json().catch(() => null)) as Envelope<T> | null
   if (!body) throw new ApiError(res.status, 'NETWORK', 'اتصال به سرور برقرار نشد.')
   if (!body.success) {
-    throw new ApiError(res.status, body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای نامشخص.', body.error?.details ?? {})
+    if (res.status === 401) clearToken() // نشست منقضی — استراتژی ساده
+    throw new ApiError(
+      res.status,
+      body.error?.code ?? 'UNKNOWN',
+      body.error?.message ?? 'خطای نامشخص.',
+      body.error?.details ?? {},
+    )
   }
   return body.data as T
 }

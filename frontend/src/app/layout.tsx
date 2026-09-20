@@ -5,10 +5,11 @@
  * Sections: Today, Study, Tests, Review, Plan, Exams, Progress, Settings
  */
 import { useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Icon, type IconName } from '../components/Icon'
 import { useTheme } from './theme'
+import { useAuth } from './auth'
 import { todayJalali, formatJalaliLong, weekdayFa } from '../lib/dates'
 import { BackendStatus } from './BackendStatus'
 import { D, modal, backdrop } from '../motion/variants'
@@ -35,6 +36,30 @@ function ThemeToggle() {
       className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-surface text-muted hover:text-ink"
     >
       <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
+    </motion.button>
+  )
+}
+
+function UserChip() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  if (!user) return null
+  const initials = (user.full_name || user.email || '?')
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+  return (
+    <motion.button
+      whileTap={{ scale: 0.92 }}
+      transition={{ duration: D.fast }}
+      onClick={() => navigate('/settings')}
+      aria-label="حساب کاربری"
+      title={user.full_name || user.email}
+      className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-body font-bold text-white"
+    >
+      {initials}
     </motion.button>
   )
 }
@@ -107,6 +132,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {weekdayFa(t)}، {formatJalaliLong(t)}
           </div>
           <div className="flex items-center gap-2">
+            <UserChip />
             <BackendStatus />
             <ThemeToggle />
           </div>
