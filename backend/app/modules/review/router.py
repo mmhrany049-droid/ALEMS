@@ -13,6 +13,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.events import REVIEW_COMPLETED, Event, event_bus
+
 from app.db.session import get_db
 from app.modules.review import service
 from app.modules.review.schemas import PostponeIn
@@ -53,6 +55,13 @@ def complete(
 ):
     item = service.complete(db, student, review_id)
     db.commit()
+    # بعد از commit — مصرف‌کننده (rewards ledger، فاز ۷) داده commitشده را می‌بیند
+    event_bus.publish(
+        Event(
+            REVIEW_COMPLETED,
+            {"student_id": student.id, "item_id": item["id"], "question_id": item["question_id"], "cycle_index": item["cycle_index"]},
+        )
+    )
     return ok(data=item)
 
 

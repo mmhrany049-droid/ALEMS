@@ -18,6 +18,7 @@ KEY_INCLUDE_BLANK = "include_blank_in_review"
 KEY_MAX_DAILY = "max_daily_review"
 KEY_MIN_CLUSTER = "min_cluster"
 KEY_PENALTY_K = "konkurs_penalty_k"
+KEY_STREAK_GRACE = "streak_grace_days"
 
 
 def get_all(db) -> dict:
@@ -34,6 +35,7 @@ def get_all(db) -> dict:
         "max_daily_review": int(get_meta_value(db, KEY_MAX_DAILY, str(domain.DEFAULT_MAX_DAILY_REVIEW))),
         "min_cluster": int(get_meta_value(db, KEY_MIN_CLUSTER, str(domain.DEFAULT_MIN_CLUSTER))),
         "konkurs_penalty_k": float(get_meta_value(db, KEY_PENALTY_K, str(domain.DEFAULT_PENALTY_K))),
+        "streak_grace_days": int(get_meta_value(db, KEY_STREAK_GRACE, str(domain.DEFAULT_STREAK_GRACE_DAYS))),
     }
 
 
@@ -53,5 +55,7 @@ def update(db, payload) -> dict:
         set_meta_value(db, KEY_MIN_CLUSTER, str(int(data["min_cluster"])))
     if "konkurs_penalty_k" in data and data["konkurs_penalty_k"] is not None:
         set_meta_value(db, KEY_PENALTY_K, str(float(data["konkurs_penalty_k"])))
+    if "streak_grace_days" in data and data["streak_grace_days"] is not None:
+        set_meta_value(db, KEY_STREAK_GRACE, str(int(data["streak_grace_days"])))
     db.flush()
     return get_all(db)

@@ -13,7 +13,6 @@ import datetime as dt
 from fastapi.exceptions import HTTPException
 from sqlalchemy import func, select
 
-from app.core.events import CHECKIN_SUBMITTED, Event, event_bus
 from app.core.jalali import JalaliDate, gregorian_to_jalali, today_jalali
 from app.modules.student import domain
 from app.modules.student.models import CHECKIN_DIMENSIONS, Checkin, Student, TaughtTopic
@@ -53,7 +52,7 @@ def update_profile(db, student: Student, update) -> Student:
     return student
 
 
-def submit_checkin(db, student: Student, payload) -> Checkin:
+def submit_checkin(db, student: Student, payload) -> tuple[Checkin, bool]:
     """Upsert: one check-in per (student, Tehran day) — never a duplicate."""
     errors = domain.validate_checkin_payload(payload.model_dump())
     if errors:
@@ -73,8 +72,8 @@ def submit_checkin(db, student: Student, payload) -> Checkin:
     checkin.updated_at = dt.datetime.now(dt.timezone.utc)
     db.flush()
 
-    event_bus.publish(Event(CHECKIN_SUBMITTED, {"student_id": student.id, "date": day.isoformat(), "created": created}))
-    return checkin
+    # رویداد CHECKIN_SUBMITTED در router و «بعد از commit» publish می‌شود (rewards consumer)
+    return checkin, created
 
 
 def get_state(db, student: Student) -> StateOut:

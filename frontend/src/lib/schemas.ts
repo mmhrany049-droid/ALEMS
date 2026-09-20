@@ -255,6 +255,7 @@ export interface AppSettings {
   max_daily_review: number
   min_cluster: number
   konkurs_penalty_k: number
+  streak_grace_days: number
 }
 
 export interface ReviewMarks {
@@ -511,12 +512,14 @@ export interface RecReason {
 }
 
 export interface RecommendationPayload {
-  kind: 'task' | 'review' | 'study' | 'none'
+  kind: 'task' | 'review' | 'study' | 'test_easy' | 'none'
   title: string
   minutes?: number | null
   task_id?: string | null
   review_item_id?: string | null
   topic_id?: string | null
+  /** «چرا این پیشنهاد؟» — توضیح فارسی با عدد و شاهد (doc 07 §7.6 #6، فاز ۷) */
+  explain_fa?: string | null
 }
 
 export interface RecommendationOut {
@@ -974,3 +977,71 @@ export interface ExportJsonOut {
 }
 
 export type PdfReportKind = 'daily' | 'weekly' | 'monthly' | 'summary'
+
+// ---------------------------------------------------------------------------
+// Phase 7 — Rewards & Behavior (doc 13): points ledger · streak · badges ·
+// habit advice (فقط data_days>=30) · procrastination aid · explain
+// ---------------------------------------------------------------------------
+
+export interface StreakOut {
+  current: number
+  longest: number
+  last_active_date: string | null
+  grace_days: number
+}
+
+export interface HabitAdviceOut {
+  available: boolean
+  data_days: number
+  min_data_days?: number
+  median_done?: number
+  suggested_daily_tasks?: number
+  message_fa?: string
+}
+
+export interface ProcrastinationAid {
+  kind: 'split' | 'easy_start'
+  task_id?: string | null
+  task_title?: string | null
+  minutes?: number | null
+  topic_id?: string | null
+  topic_title?: string | null
+  avg_completion_rate: number
+  message_fa: string
+}
+
+export interface LatestCheckin {
+  date: string
+  date_jalali: string
+  energy: number
+  focus: number
+  motivation: number
+  stress: number
+  fatigue: number
+}
+
+export interface RewardsSummary {
+  points_total: number
+  points_by_source: Record<string, number>
+  streak: StreakOut
+  badges: { earned_count: number; total: number; recent: { code: string; title_fa: string }[] }
+  habit_advice: HabitAdviceOut
+  procrastination: ProcrastinationAid | null
+  latest_checkin: LatestCheckin | null
+}
+
+export interface BadgeRow {
+  code: string
+  title_fa: string
+  description_fa: string
+  kind: string
+  target: number
+  earned: boolean
+  awarded_at: string | null
+  progress: { value: number; current: number; target: number }
+}
+
+export interface BadgesOut {
+  items: BadgeRow[]
+  earned_count: number
+}

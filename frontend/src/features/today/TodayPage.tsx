@@ -4,11 +4,11 @@
  * Motion: cascade بلوک‌ها با todayCascade/todayBlock (doc 07.4 #5).
  */
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../../lib/api'
-import type { PlanTaskOut, RecommendationOut, TodayOut } from '../../lib/schemas'
+import type { PlanTaskOut, RecommendationOut, RewardsSummary, TodayOut } from '../../lib/schemas'
 import { Page } from '../../components/Page'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
@@ -34,6 +34,7 @@ export function TodayPage() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['today'] })
     qc.invalidateQueries({ queryKey: ['state'] })
+    qc.invalidateQueries({ queryKey: ['rewards-summary'] }) // هر فعالیت → امتیاز/streak تازه
   }
 
   const statusM = useMutation({
@@ -123,6 +124,11 @@ export function TodayPage() {
             />
           </motion.div>
         )}
+
+        {/* ۳.۵) پیوستگی و پاداش (doc 13 — فاز ۷) */}
+        <motion.div variants={todayBlock}>
+          <RewardsCard />
+        </motion.div>
 
         {/* ۴) برنامه امروز (doc 07.6 — چک‌لیست واقعی) */}
         <motion.div variants={todayBlock}>
@@ -304,6 +310,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function RecommendationCard({ rec, busy, onRespond }: { rec: RecommendationOut; busy: boolean; onRespond: (s: 'accepted' | 'rejected') => void }) {
   const answered = rec.status !== 'suggested'
+  const [why, setWhy] = useState(false)
   return (
     <Card className="border-primary/40 bg-primary-soft/40 p-4 md:p-5">
       <div className="flex flex-wrap items-center gap-2">
@@ -323,13 +330,38 @@ function RecommendationCard({ rec, busy, onRespond }: { rec: RecommendationOut; 
         <p className="text-body-sm text-muted">{faDigits(rec.payload.minutes)} دقیقه</p>
       )}
       {/* دلیل(ها) — doc 08 §8.10: هر پیشنهاد ≥۱ دلیل با کد قابل ترجمه */}
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {rec.reasons.map((r) => (
           <span key={r.code} className="rounded-md bg-surface px-2 py-0.5 text-[11px] font-medium text-muted" title={r.code}>
             {r.fa}
           </span>
         ))}
+        <button
+          type="button"
+          onClick={() => setWhy((v) => !v)}
+          className="mr-auto rounded-md px-2 py-0.5 text-[11px] font-bold text-primary hover:underline"
+          aria-expanded={why}
+        >
+          {why ? 'بستن «چرا»' : 'چرا این پیشنهاد؟'}
+        </button>
       </div>
+      {/* چرا این پیشنهاد؟ — توضیح فارسی با عدد و شاهد (doc 07 §7.6 #6، فاز ۷) */}
+      <AnimatePresence initial={false}>
+        {why && (
+          <motion.div
+            key="why"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="mt-2 rounded-lg bg-surface px-3 py-2 text-body-sm leading-6">
+              {rec.payload.explain_fa ?? rec.reasons.map((r) => r.fa).join(' · ')}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {!answered && (
         <div className="mt-3 flex gap-2">
           <Button onClick={() => onRespond('accepted')} disabled={busy}>می‌پذیرم — شروع کن</Button>
@@ -382,5 +414,51 @@ function TaskRow({ task, busy, onToggle }: { task: PlanTaskOut; busy: boolean; o
         </div>
       )}
     </li>
+  )
+}
+
+/** پیوستگی + امتیاز + نشان‌ها (doc 13) — streak فقط با فعالیت مطالعاتی معتبر (§8.9) */
+function RewardsCard() {
+  const q = useQuery({ queryKey: ['rewards-summary'], queryFn: () => api.get<RewardsSummary>('/rewards/summary') })
+  if (q.isLoading) return <Card className="flex justify-center p-5"><Spinner /></Card>
+  if (q.isError || !q.data) return null
+  const s = q.data
+  return (
+    <Card className="p-4 md:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Icon name="sparkle" size={18} />
+        <h2 className="text-title-sm font-bold">پیوستگی و پاداش</h2>
+        <span className="mr-auto text-[11px] text-muted">
+          {faDigits(s.badges.earned_count)} از {faDigits(s.badges.total)} نشان
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2.5">
+        <Stat label="پیوستگی جاری" value={`${'🔥'} ${faDigits(s.streak.current)} روز`} />
+        <Stat label="رکورد پیوستگی" value={`${faDigits(s.streak.longest)} روز`} />
+        <Stat label="امتیاز کل" value={faDigits(s.points_total)} />
+      </div>
+      {s.streak.grace_days > 0 && (
+        <p className="mt-2 text-[11px] text-muted">{faDigits(s.streak.grace_days)} روز ارفاق فعال است.</p>
+      )}
+      {s.badges.recent.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {s.badges.recent.map((b) => (
+            <span key={b.code} className="rounded-md bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">
+              {b.title_fa} 🏅
+            </span>
+          ))}
+        </div>
+      )}
+      {/* habit advice — فقط وقتی ۳۰ روز داده هست نمایش داده می‌شود (doc 08 §8.9) */}
+      {s.habit_advice.available && s.habit_advice.message_fa && (
+        <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-body-sm leading-6">{s.habit_advice.message_fa}</p>
+      )}
+      {/* procrastination aid (doc 13.5) */}
+      {s.procrastination && (
+        <p className="mt-2 rounded-lg bg-warning-soft px-3 py-2 text-body-sm leading-6 text-warning">
+          {s.procrastination.message_fa}
+        </p>
+      )}
+    </Card>
   )
 }

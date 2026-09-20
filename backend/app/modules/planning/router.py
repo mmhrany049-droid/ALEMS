@@ -20,6 +20,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.events import PLAN_UPDATED, Event, event_bus
+
 from app.db.session import get_db
 from app.modules.planning import service
 from app.modules.planning.schemas import (
@@ -186,6 +188,8 @@ def set_task_status(
 ):
     result = service.set_task_status(db, student, task_id, body.status)
     db.commit()
+    # بعد از commit — مصرف‌کننده (rewards ledger، فاز ۷): تکمیل کار = رویداد امتیازآور
+    event_bus.publish(Event(PLAN_UPDATED, {"student_id": student.id, "task_id": task_id, "status": body.status}))
     return ok(data=result)
 
 

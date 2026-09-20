@@ -587,7 +587,7 @@ def set_task_status(db, student: Student, task_id: str, status: str) -> dict:
     t.status = status
     t.updated_at = _utcnow()
     db.flush()
-    event_bus.publish(Event(PLAN_UPDATED, {"student_id": student.id, "task_id": task_id, "status": status}))
+    # رویداد PLAN_UPDATED(status) در router و «بعد از commit» publish می‌شود (rewards consumer)
     return _task_out(t)
 
 
@@ -1048,7 +1048,11 @@ def recommendation_today(db, student: Student, create: bool = True) -> dict | No
     review_top = q["items"][:5]
     priority = get_priority_week(db, student)["items"]
 
-    picked = domain.recommendation_pick(plan_items, review_top, priority)
+    # doc 13.5 — procrastination aid به‌عنوان منبع پیشنهاد (models-only import، بدون چرخه)
+    from app.modules.rewards import service as rewards_service
+
+    aid = rewards_service.procrastination_for(db, student)
+    picked = domain.recommendation_pick(plan_items, review_top, priority, procrastination=aid)
     row = Recommendation(
         student_id=student.id,
         date=today,

@@ -17,7 +17,7 @@ from collections import defaultdict
 from fastapi.exceptions import HTTPException
 from sqlalchemy import func, select
 
-from app.core.events import REVIEW_COMPLETED, TEST_RECORDS_CREATED, Event, event_bus
+from app.core.events import TEST_RECORDS_CREATED, Event, event_bus
 from app.core.jalali import JalaliDate, gregorian_to_jalali, today_jalali
 from app.db.session import session_scope
 from app.modules.academic.models import Question, Resource, Topic
@@ -340,12 +340,8 @@ def complete(db, student: Student, item_id: str) -> dict:
     item.updated_at = item.last_reviewed_at
     db.flush()
 
-    event_bus.publish(
-        Event(
-            REVIEW_COMPLETED,
-            {"student_id": student.id, "item_id": item.id, "question_id": item.question_id, "cycle_index": item.cycle_index},
-        )
-    )
+    # رویداد REVIEW_COMPLETED در router و «بعد از commit» publish می‌شود (الگوی خانه —
+    # مصرف‌کننده rewards با session جدا می‌نویسد؛ قفل نوشتن SQLite باید آزاد باشد).
     latest, _wc, _rows = _attempt_maps(db, student.id, [item.question_id])
     marks = _marks_map(db, student.id, [item.question_id])
     return _item_out(item, intervals, today, latest.get(item.question_id), marks.get(item.question_id))

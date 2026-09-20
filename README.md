@@ -17,7 +17,7 @@
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ✅ انجام شد |
 | 5 | Planning & Today (capacity، generate-week، override) | ✅ انجام شد |
 | 6 | Exam & Analytics (exam center، متریک‌ها، export) | ✅ |
-| 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ⬜ |
+| 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ✅ |
 | 8 | Polish & Hardening (focus mode، backup، AT کامل) | ⬜ |
 
 ---
@@ -96,7 +96,7 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — 138 تست: envelope، تقویم جلالی، health، auth، student، books، test engine، review، planner، exams، analytics، reports، export
+cd backend && .venv/bin/python -m pytest   # pytest — 154 تست: envelope، تقویم جلالی، health، auth، student، books، test engine، review، planner، exams، analytics، reports، export، rewards
 cd frontend && npm run build               # type-check + build
 ```
 
@@ -205,6 +205,22 @@ cd frontend && npm run build               # type-check + build
 - [x] رویداد `EXAM_FINISHED` بعد از submit منتشر می‌شود؛ پیام‌های خطای فارسی («آزمون پیدا نشد.»، «عنوان آزمون نمی‌تواند خالی باشد.»، …)
 - [x] Migration Alembic **0007_exams** (تنها جدول جدید — analytics/report/export ویوی محاسباتی‌اند)
 - [x] 138/138 pytest سبز · vite build سبز · آزمون زنده **۴۹/۴۹** روی سرور واقعی (+ E2E از طریق پروکسی Vite)
+
+---
+
+## معیار پذیرش فاز ۷ (خود-بررسی)
+
+- [x] **Points ledger append-only** (doc 13.1): چهار رویداد امتیازآور — تکمیل plan item (۵) · مرور کامل (۲) · اتمام جلسه تست (۱۰) · check-in روزانه (۳، سقف ۱ در روز)؛ امضای یکتایی `(student, source, ref)` → رویداد تکراری/ایدمپوتنت هرگز دوباره امتیاز نمی‌گیرد (un-done→done دوباره امتیاز ندارد)
+- [x] **معماری رویدادمحور** (doc 03 §3.4 — rewards مصرف‌کننده event bus است): publish های REVIEW_COMPLETED و CHECKIN_SUBMITTED و PLAN_UPDATED(status) به **router و بعد از commit** منتقل شدند تا مصرف‌کننده با session جدا روی SQLite قفل نوشت نگیرد
+- [x] **Streak شمسی** (doc 13.2): فعالیت معتبر در روز شمسی؛ روز از دست رفته → reset؛ `streak_grace_days` از settings (پیش‌فرض ۰، اعتبارسنجی فارسی «روزهای ارفاق…»)؛ current تا پایان امروز از streak دیروز محافظت می‌کند؛ longest بدون grace
+- [x] **Badges seed** (doc 13.3 + OD4: ۸ تا ۱۲ نشان): ۱۰ نشان با کد/عنوان/شرط (kind+target) — seed idempotent در startup؛ **امضای دریافت یکتا per user/badge**؛ progress در پاسخ
+- [x] **Habit advice فقط اگر data_days ≥ 30** (doc 13.4 + doc 08 §8.9 — زیر ۳۰ روز هرگز نمایش داده نمی‌شود): پیشنهاد تعداد کار روزانه = **میانه انجام واقعی**
+- [x] **Procrastination aid ساده** (doc 13.5): completion_rate پایین در ۳ روز اخیر + task بزرگ باز (≥۶۰ دقیقه) → پیشنهاد **split**؛ وگرنه با مبحث ضعیف (readiness<0.6) → **«۵ تست آسان از مبحث X»**
+- [x] **Recommendation امروز + دلیل فارسی** (§8.10): aid به‌عنوان منبع پیشنهاد وارد `recommendation_pick` شد (reason codes جدید: procrastination_split / procrastination_start)؛ هر payload حالا **explain_fa** دارد — «چرا این پیشنهاد؟» با عدد و شاهد، حتی برای no_demand
+- [x] **State dimensions** (doc 13.6): latest_checkin (خودگزارشی ۱..۵) در summary
+- [x] Frontend: کارت **«پیوستگی و پاداش»** در Today Hub (🔥 streak جاری/رکورد/امتیاز + نشان‌های اخیر + habit advice + aid) و دکمه **«چرا این پیشنهاد؟»** با panel بازشو (Framer Motion) روی کارت پیشنهاد؛ فیلد grace در تنظیمات
+- [x] Migration Alembic **0008_rewards** (points_ledger/streaks/badges/badge_awards)
+- [x] 154/154 pytest سبز · vite build سبز · آزمون زنده **۲۰/۲۰** · E2E از طریق پروکسی Vite
 
 ---
 

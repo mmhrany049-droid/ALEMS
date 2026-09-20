@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from app.core.jalali import fa_digit
+
 # --- pipeline ثابت (doc 11.3 — کد باید همین ترتیب را لاگ کند) -------------------------
 
 PIPELINE: tuple[str, ...] = (
@@ -57,6 +59,8 @@ REASON_LABELS_FA: dict[str, str] = {
     "recovery": "جبران عقب‌افتادگی",
     "no_demand": "نیازی ثبت نشده — امروز سبک است",
     "exam_prep": "آمادگی آزمون نزدیک",
+    "procrastination_split": "کار بزرگِ باز — تقسیم کن و فقط شروع کن",
+    "procrastination_start": "شروع نرم برای شکستن چرخه اهمال",
 }
 
 
@@ -301,45 +305,110 @@ def recommendation_pick(
     today_tasks: list[dict],
     review_top: list[dict],
     top_priority: list[dict],
+    procrastination: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """payload + reasons (doc 08 §8.10: حداقل یک reason code قابل ترجمه فارسی)."""
+    """payload + reasons (doc 08 §8.10: حداقل یک reason code قابل ترجمه فارسی).
+
+    هر payload یک explain_fa دارد — «چرا این پیشنهاد؟» با عدد و شاهد (doc 07 §7.6 #6، فاز ۷).
+    procrastination aid (doc 13.5): اگر کار بزرگِ باز امروز است → split؛ وگرنه وقتی کار
+    بازی نیست → «۵ تست آسان از مبحث X».
+    """
     pending = [t for t in today_tasks if t.get("status") == "pending"]
+    split_id = (procrastination or {}).get("task_id") if (procrastination or {}).get("kind") == "split" else None
+
     if pending:
         t = pending[0]
+        # aid فعال و کار بزرگ همان کار امروز است → پیشنهاد split جای حالت معمولی
+        if split_id:
+            match = next((p for p in pending if p.get("id") == split_id), None)
+            if match is not None:
+                t = match
+                reasons = ["procrastination_split"]
+                if t.get("reason_code"):
+                    reasons.append(t["reason_code"])
+                mins = fa_digit(str(t.get("minutes") or 0))
+                return {
+                    "payload": {
+                        "kind": "task",
+                        "title": f"تقسیم «{t.get('title')}» — فقط بخش اول",
+                        "minutes": 25,
+                        "task_id": t.get("id"),
+                        "explain_fa": (
+                            f"چون چند روز است کمتر از نصف کارهایت را تمام کرده‌ای و «{t.get('title')}»"
+                            f" {mins} دقیقه‌ای هنوز باز است — تمامش نکن؛ فقط بخش اول ۲۵ دقیقه‌ای را شروع کن."
+                        ),
+                    },
+                    "reasons": reasons,
+                }
         reasons = ["today_task"]
         if t.get("reason_code") and t["reason_code"] not in reasons:
             reasons.append(t["reason_code"])
+        mins = fa_digit(str(t.get("minutes") or 0))
         return {
             "payload": {
                 "kind": "task",
                 "title": t.get("title"),
                 "minutes": t.get("minutes"),
                 "task_id": t.get("id"),
+                "explain_fa": f"چون کار امروزت هنوز باز است: «{t.get('title')}» ({mins} دقیقه) — انجامش برنامه هفته و پیوستگی‌ات را زنده نگه می‌دارد.",
             },
             "reasons": reasons,
         }
+    if procrastination and procrastination.get("kind") == "easy_start":
+        title = procrastination.get("topic_title") or "مبحث اولویت‌دار"
+        return {
+            "payload": {
+                "kind": "test_easy",
+                "title": f"۵ تست آسان از «{title}»",
+                "topic_id": procrastination.get("topic_id"),
+                "minutes": 15,
+                "explain_fa": procrastination.get("message_fa") or f"با ۵ تست آسان از «{title}» شروع کن.",
+            },
+            "reasons": ["procrastination_start"],
+        }
+    if procrastination and procrastination.get("kind") == "split":
+        return {
+            "payload": {
+                "kind": "task",
+                "title": f"تقسیم «{procrastination.get('task_title')}» — بخش اول",
+                "task_id": procrastination.get("task_id"),
+                "minutes": 25,
+                "explain_fa": procrastination.get("message_fa") or "کار بزرگ باز است — تقسیمش کن و بخش اول را شروع کن.",
+            },
+            "reasons": ["procrastination_split"],
+        }
     if review_top:
-        critical = any(r.get("critical") for r in review_top)
+        critical = sum(1 for r in review_top if r.get("critical"))
+        n = fa_digit(str(len(review_top)))
+        crit_fa = f" که {fa_digit(str(critical))} تا بحرانی است" if critical else ""
         return {
             "payload": {
                 "kind": "review",
-                "title": f"مرور {len(review_top)} آیتم سررسیده",
+                "title": f"مرور {n} آیتم سررسیده",
                 "review_item_id": review_top[0].get("id"),
+                "explain_fa": f"چون {n} مرور سررسیده داری{crit_fa} — مرور همان چیزی را که خوانده‌ای زنده نگه می‌دارد؛ امروز صفرش کن.",
             },
             "reasons": ["review_critical" if critical else "review_due"],
         }
     if top_priority:
         t = top_priority[0]
+        title = t.get("topic_title") or "مبحث اولویت‌دار"
+        first_reason = (t.get("reason_codes") or ["low_readiness"])[0]
         return {
             "payload": {
                 "kind": "study",
-                "title": f"مطالعه {t.get('topic_title') or 'مبحث اولویت‌دار'}",
+                "title": f"مطالعه {title}",
                 "topic_id": t.get("topic_id"),
+                "explain_fa": f"چون «{title}» در رأس اولویت این هفته است ({reason_fa(first_reason)}) — یک قدم جلویش بینداز.",
             },
             "reasons": t.get("reason_codes") or ["low_readiness"],
         }
     return {
-        "payload": {"kind": "none", "title": "امروز سبک است — استراحت فعال یا مرور آزاد"},
+        "payload": {
+            "kind": "none",
+            "title": "امروز سبک است — استراحت فعال یا مرور آزاد",
+            "explain_fa": "چون امروز تقاضای مشخصی نداری — یک مرور آزاد یا تست سبک کافی است؛ همین پیوستگی را نگه می‌دارد.",
+        },
         "reasons": ["no_demand"],
     }
 

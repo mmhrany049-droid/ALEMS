@@ -24,6 +24,7 @@ function ReviewSettingsCard() {
   const [minCluster, setMinCluster] = useState('')
   const [penaltyK, setPenaltyK] = useState('')
   const [includeBlank, setIncludeBlank] = useState(false)
+  const [streakGrace, setStreakGrace] = useState('')
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
@@ -33,6 +34,7 @@ function ReviewSettingsCard() {
     setMinCluster(String(q.data.min_cluster))
     setPenaltyK(String(q.data.konkurs_penalty_k))
     setIncludeBlank(q.data.include_blank_in_review)
+    setStreakGrace(String(q.data.streak_grace_days ?? 0))
   }, [q.data])
 
   const save = useMutation({
@@ -46,6 +48,7 @@ function ReviewSettingsCard() {
         min_cluster: Number(minCluster),
         konkurs_penalty_k: Number(penaltyK),
         include_blank_in_review: includeBlank,
+        streak_grace_days: Number(streakGrace === '' ? 0 : streakGrace),
       }),
     onSuccess: (data) => {
       qc.setQueryData(['settings'], data)
@@ -71,7 +74,7 @@ function ReviewSettingsCard() {
 
   return (
     <Card className="mt-4 p-4 md:p-5">
-      <h2 className="mb-1 text-title-sm font-bold">مرور و نمره‌گذاری</h2>
+      <h2 className="mb-1 text-title-sm font-bold">مرور، نمره‌گذاری و پیوستگی</h2>
       <p className="mb-4 text-body-sm text-muted">
         چرخه مرور فاصله‌ای (روز) — پیش‌فرض {toFa('1, 3, 7, 14')}. تغییرات فوراً در صف مرور و درصد کنکور اثر
         می‌کنند.
@@ -93,6 +96,10 @@ function ReviewSettingsCard() {
         <label className="block">
           <span className="mb-1 block text-body-sm font-semibold">حداقل اندازه خوشه</span>
           <input dir="ltr" className={inputCls} value={minCluster} onChange={(e) => setMinCluster(num(e.target.value))} placeholder="8" aria-label="حداقل اندازه خوشه" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-body-sm font-semibold">روزهای ارفاق پیوستگی (grace)</span>
+          <input dir="ltr" className={inputCls} value={streakGrace} onChange={(e) => setStreakGrace(num(e.target.value))} placeholder="0" aria-label="روزهای ارفاق پیوستگی" />
         </label>
       </div>
 

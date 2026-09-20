@@ -31,6 +31,7 @@ from app.core.versioning import (
 )
 from app.db.session import get_engine, session_scope
 from app.modules.review.service import register_event_consumers
+from app.modules.rewards import service as rewards_service
 from app.shared.envelope import ok, register_envelope_handlers
 
 logger = logging.getLogger("alems")
@@ -51,8 +52,11 @@ async def lifespan(app: FastAPI):
     ensure_directories(settings)
     with session_scope() as db:
         init_meta(db)
+        rewards_service.ensure_badge_seed(db)  # doc 13.3 — seed نشان‌ها (OD4: ۸ تا ۱۲)
     # doc 03 §3.4 — مصرف‌کنندگان رویداد: test finish/past → review rebuild + learning states
     register_event_consumers()
+    # doc 03 §3.4 — rewards هم مصرف‌کننده رویدادهاست (points ledger، فاز ۷)
+    rewards_service.register_event_consumers()
     logger.info(
         "%s نسخه %s راه‌اندازی شد — backend :%d | DB: %s",
         settings.app_name,

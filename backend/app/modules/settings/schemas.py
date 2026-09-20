@@ -12,3 +12,4 @@ class SettingsUpdate(BaseModel):
     max_daily_review: int | None = None
     min_cluster: int | None = None
     konkurs_penalty_k: float | None = None
+    streak_grace_days: int | None = None

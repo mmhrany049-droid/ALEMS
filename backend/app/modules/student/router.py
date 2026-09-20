@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.events import CHECKIN_SUBMITTED, Event, event_bus
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.student import service
@@ -45,8 +46,10 @@ def checkin(
     db: Session = Depends(get_db),
     student: Student = Depends(get_current_student),
 ):
-    checkin = service.submit_checkin(db, student, body)
+    checkin, created = service.submit_checkin(db, student, body)
     db.commit()
+    # بعد از commit — مصرف‌کننده (rewards ledger، فاز ۷)
+    event_bus.publish(Event(CHECKIN_SUBMITTED, {"student_id": student.id, "date": checkin.date.isoformat(), "created": created}))
     return ok(data=service.get_state(db, student).model_dump(mode="json"))
 
 
