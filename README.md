@@ -44,8 +44,8 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+# migrationها خودکار هنگام startup اجرا می‌شوند (alembic upgrade head — idempotent)
 
 # Terminal 2 — Frontend
 cd frontend
@@ -60,19 +60,27 @@ npm run dev
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-alembic upgrade head
+pip install -r requirements.txt   # شامل tzdata — برای Asia/Tehran روی ویندوز الزامی است
 cd ..\frontend
 npm install
 
 # Terminal 1 — Backend
 cd backend
 .venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+# migrationها خودکار هنگام startup اجرا می‌شوند
 
 # Terminal 2 — Frontend
 cd frontend
 npm run dev
 ```
+
+### خطایابی سریع
+
+| خطا | علت و راه‌حل |
+|---|---|
+| `ZoneInfoNotFoundError: No time zone found with key Asia/Tehran` (ویندوز/کانتینر slim) | ویندوز دیتابیس IANA timezone ندارد → `pip install tzdata` (در `backend/requirements.txt` هست؛ بعد از `git pull` یک‌بار `pip install -r requirements.txt` بزنید). |
+| `sqlite3.OperationalError: no such table: app_metadata` | دیتابیس migrate نشده — از این نسخه به بعد migration خودکار در startup انجام می‌شود؛ دستی: `cd backend && alembic upgrade head`. |
+| پورت 8010/5173 اشغال | پروسه قبلی را ببندید یا `PORT`/`FRONTEND_PORT` را در `.env` عوض کنید. |
 
 ### env های Backend (پیش‌فرض‌ها در `app/core/config.py`)
 

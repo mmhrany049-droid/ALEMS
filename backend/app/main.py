@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import api_router
-from app.core.config import get_settings
+from app.core.config import BACKEND_ROOT, get_settings
 from app.core.files import ensure_directories
 from app.core.jalali import TEHRAN, today_jalali
 from app.core.versioning import (
@@ -46,10 +46,27 @@ def _setup_logging() -> None:
     )
 
 
+def _run_migrations() -> None:
+    """doc 05 — تغییر schema فقط از راه Alembic.
+
+    migration خودکار به head هنگام startup (idempotent): کلون تازه با دیتابیس خالی
+    دیگر به «no such table: app_metadata» نمی‌خورد و نیاز به دستور دستی
+    `alembic upgrade head` نیست (در ویندوز که scripts/*.sh هم اجرا نمی‌شود).
+    مسیرها به BACKEND_ROOT لنگر شده‌اند → مستقل از دایرکتوری اجرا.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
+    command.upgrade(cfg, "head")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
     ensure_directories(settings)
+    _run_migrations()
     with session_scope() as db:
         init_meta(db)
         rewards_service.ensure_badge_seed(db)  # doc 13.3 — seed نشان‌ها (OD4: ۸ تا ۱۲)

@@ -13,6 +13,9 @@ reportlab==5.0.1
 arabic-reshaper==3.0.1
 python-bidi==0.6.11
 pyzipper==0.4.0
+# zoneinfo در ویندوز (و کانتینرهای slim) دیتابیس IANA ندارد → ZoneInfo("Asia/Tehran")
+# بدون این پکیج با ZoneInfoNotFoundError می‌ترکد. روی Linux/macOS فقط fallback است.
+tzdata==2026.4
 
 # dev / test
 pytest==9.1.1
