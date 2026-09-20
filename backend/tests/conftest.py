@@ -1,6 +1,6 @@
 """Test fixtures — isolated temp DB, alembic migrations, TestClient.
 
-The env vars MUST be set before importing app.* (settings are cached).
+Env vars MUST be set before importing app.* (settings are cached).
 """
 from __future__ import annotations
 
@@ -12,11 +12,14 @@ from pathlib import Path
 import pytest
 
 _tmp = Path(tempfile.mkdtemp(prefix="alems-test-"))
-os.environ["ALEMS_DATABASE_URL"] = f"sqlite:///{(_tmp / 'test.db').as_posix()}"
-os.environ["ALEMS_DATA_DIR"] = str(_tmp / "data")
-os.environ["ALEMS_BACKUPS_DIR"] = str(_tmp / "backups")
-os.environ["ALEMS_EXPORTS_DIR"] = str(_tmp / "exports")
-os.environ["ALEMS_IMPORTS_DIR"] = str(_tmp / "imports")
+os.environ["APP_NAME"] = "ALEMS"
+os.environ["APP_VERSION"] = "2.0.0"
+os.environ["DATABASE_URL"] = f"sqlite:///{(_tmp / 'test.db').as_posix()}"
+os.environ["DATA_DIR"] = str(_tmp / "data")
+os.environ["BACKUPS_DIR"] = str(_tmp / "backups")
+os.environ["EXPORTS_DIR"] = str(_tmp / "exports")
+os.environ["IMPORTS_DIR"] = str(_tmp / "imports")
+os.environ["TIMEZONE"] = "Asia/Tehran"
 
 # make backend/ importable
 BACKEND = Path(__file__).resolve().parents[1]
@@ -30,7 +33,6 @@ def _migrated():
     from alembic.config import Config
 
     cfg = Config(str(BACKEND / "alembic.ini"))
-    cfg.attributes["configure_logger"] = False
     command.upgrade(cfg, "head")
     yield
 

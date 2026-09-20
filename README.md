@@ -22,9 +22,11 @@
 
 ---
 
-## اجرا (فاز ۰)
+## اجرا
 
 پیش‌نیاز: Python 3.11+ ، Node 18+
+
+### Linux / macOS
 
 ```bash
 # یک‌بار برای راه‌اندازی
@@ -34,54 +36,83 @@
 ./scripts/run.sh
 ```
 
+یا دستی:
+
+```bash
+# Terminal 1 — Backend
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+
+# Terminal 2 — Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+### Windows (PowerShell)
+
+```powershell
+# یک‌بار
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+cd ..\frontend
+npm install
+
+# Terminal 1 — Backend
+cd backend
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+
+# Terminal 2 — Frontend
+cd frontend
+npm run dev
+```
+
+### env های Backend (پیش‌فرض‌ها در `app/core/config.py`)
+
+```
+APP_NAME=ALEMS
+APP_VERSION=2.0.0
+HOST=127.0.0.1
+PORT=8010
+DATABASE_URL=sqlite:///./data/alems.db
+TIMEZONE=Asia/Tehran
+```
+
 سپس:
 
 - UI: <http://localhost:5173> (پروکسی Vite → `http://127.0.0.1:8010`)
-- API health: <http://localhost:8010/health>
-- Swagger: <http://localhost:8010/docs>
+- API health: <http://127.0.0.1:8010/health> و `/api/v1/health`
+- Swagger: <http://127.0.0.1:8010/docs>
 
-پورت‌ها پیش‌فرض سند ۰۳ هستند (Backend **8010**، Frontend **5173**) و با
-`ALEMS_BACKEND_PORT` / `ALEMS_FRONTEND_PORT` قابل تغییرند.
+> پورت 8000 استفاده **نمی‌شود**؛ پیش‌فرض 8010 است (doc 02 NFR-4).
 
 ### تست‌ها
 
 ```bash
-# Backend (pytest — envelope، تقویم جلالی، event bus)
-cd backend && .venv/bin/python -m pytest
-
-# Frontend (type-check + build)
-cd frontend && npm run build
+cd backend && .venv/bin/python -m pytest   # pytest — envelope، تقویم جلالی، health
+cd frontend && npm run build               # type-check + build
 ```
 
 ---
 
-## ساختار (doc 03 §3.3)
+## معیار پذیرش فاز ۰ (خود-بررسی)
 
-```
-ALEMS/
-├── backend/
-│   ├── app/
-│   │   ├── main.py               # app factory + /health
-│   │   ├── core/                 # config, security, events, jalali, files, versioning
-│   │   ├── db/                   # SQLAlchemy 2 (WAL) — schema فقط با Alembic
-│   │   ├── shared/               # envelope پاسخ (doc 06)
-│   │   ├── modules/              # 13 ماژول: models/schemas/domain/service/router
-│   │   └── api/v1.py             # base /api/v1
-│   ├── alembic/                  # نسخه‌گذاری schema
-│   ├── tests/                    # pytest
-│   └── data/ backups/ exports/ imports/
-├── frontend/
-│   └── src/
-│       ├── app/                  # App, Layout, Theme, BackendStatus
-│       ├── components/           # UI kit (Button, Card, Page, EmptyState, Icon)
-│       ├── features/             # today, study, tests, review, plan, exams, progress, settings
-│       ├── lib/                  # api envelope, dates (jalaali-js + dayjs), health
-│       ├── motion/               # variants مشترک Framer Motion (doc 07.4)
-│       └── styles/               # tokens.css (doc 07.3) + globals.css
-└── scripts/
-    ├── setup-dev.sh
-    └── run.sh
-```
+- [x] `http://127.0.0.1:8010/health` JSON درست (envelope doc 06 + `status/app/version`)
+- [x] `http://localhost:5173` باز می‌شود RTL (Vazirmatn، `dir=rtl`)
+- [x] درخواست health از UI موفق است (پروکسی Vite → 127.0.0.1:8010؛ بدون ETIMEDOUT)
+- [x] تغییر تم dark/light کار می‌کند (localStorage)
+- [x] page transition با Framer Motion (pageVariants روی همه صفحات)
+- [x] پورت 8000 استفاده نشده
+- [x] ساختار پوشه doc 03 §3.3 · Alembic با revision پایه · پوشه‌های data/backups/exports/imports
+- [x] Error envelope یکسان با پیام فارسی
+- [x] requirements.txt کامل و نسخه‌دار
+- [x] اسکلت Today: سلام + کارت ظرفیت + کارهای امروز (mock) + بلوک مرور + cascade
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

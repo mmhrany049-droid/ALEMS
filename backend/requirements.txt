@@ -1,16 +1,16 @@
-# ALEMS 2.0 — Backend (stack اجباری سند ۰۳)
-fastapi>=0.115,<1.0
-uvicorn[standard]>=0.30
-sqlalchemy>=2.0,<3.0
-pydantic>=2.7,<3.0
-pydantic-settings>=2.2,<3.0
-alembic>=1.13,<2.0
-bcrypt>=4.1
-PyJWT>=2.8,<3.0
-openpyxl>=3.1
-reportlab>=4.2
-pyzipper>=0.3.6
+# ALEMS 2.0 — Backend (stack اجباری doc 03) — کامل و نسخه‌دار
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+SQLAlchemy==2.0.54
+pydantic==2.13.5
+pydantic-settings==2.15.0
+alembic==1.20.0
+bcrypt==5.0.0
+PyJWT==2.14.0
+openpyxl==3.1.5
+reportlab==5.0.1
+pyzipper==0.4.0
 
 # dev / test
-pytest>=8.2
-httpx>=0.27
+pytest==9.1.1
+httpx==0.28.1

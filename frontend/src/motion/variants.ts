@@ -24,6 +24,8 @@ export const page: Variants = {
   animate: { opacity: 1, y: 0, transition: { duration: D.normal, ease: EASE_OUT } },
   exit: { opacity: 0, y: -8, transition: { duration: D.fast, ease: EASE_IN_OUT } },
 }
+/** alias — phase-0 spec name */
+export const pageVariants = page
 
 /** 2) List stagger: صف مرور/برنامه — تأخیر ۳۰–۴۰ms */
 export const staggerList: Variants = {
@@ -34,6 +36,15 @@ export const staggerList: Variants = {
 export const listItem: Variants = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0, transition: { duration: D.normal, ease: EASE_OUT } },
+}
+/** alias — phase-0 spec name */
+export const listItemVariants = listItem
+
+/** fadeInUp — ورود ملایم بالا-به-پایین (doc 07.4) */
+export const fadeInUp: Variants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: { duration: D.normal, ease: EASE_OUT } },
+  exit: { opacity: 0, transition: { duration: D.fast } },
 }
 
 /** 5) Today Hub mount: cascade ورود بلوک‌ها */

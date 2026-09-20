@@ -9,9 +9,8 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
-from sqlalchemy import DateTime, String, Text, select
+from sqlalchemy import DateTime, String, Text, select, update
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import insert, update
 
 from app.db.base import Base
 

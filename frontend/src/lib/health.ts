@@ -2,6 +2,7 @@
 export interface HealthData {
   status: string
   app: string
+  version: string
   app_version: string
   schema_version: string
   alembic_revision: string

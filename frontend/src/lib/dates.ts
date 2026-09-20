@@ -67,6 +67,6 @@ export function jalaliMonthDays(jy: number, jm: number): number {
 }
 
 /** Latin → Persian digits. */
-export function faDigits(s: string): string {
-  return s.replace(/[0-9]/g, (c) => String.fromCharCode(0x06f0 + Number(c)))
+export function faDigits(s: string | number): string {
+  return String(s).replace(/[0-9]/g, (c) => String.fromCharCode(0x06f0 + Number(c)))
 }
