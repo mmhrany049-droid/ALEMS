@@ -295,11 +295,124 @@ class TestClassification:
         assert r.status_code == 422
         assert "سطح سختی" in r.json()["error"]["message"]
 
-    def test_question_without_topic_rejected(self, auth_client):
-        """سوال بدون مبحث معتبر وارد نمی‌شود (قانون ۸.۵)."""
+    def test_toc_only_import_succeeds(self, auth_client):
+        """ورود فقط‌فهرست (بدون سوال) موفق است — مبحث/زیرمبحث خالی از سوال مجاز."""
         book = {
-            "title": f"کتاب بی‌مبحث — {uuid.uuid4().hex[:6]}",
+            "title": f"کتاب فقط‌فهرست — {uuid.uuid4().hex[:6]}",
             "chapters": [{"title": "ف۱", "topics": [{"title": "م۱", "questions": []}]}],
         }
         r = auth_client.post("/api/v1/resources/import-book", json=book)
+        assert r.status_code == 200, r.text
+        stats = r.json()["data"]
+        assert stats["chapters"] == 1
+        assert stats["topics"] == 1
+        assert stats["questions"] == 0
+
+
+class TestTocOnlyImport:
+    """ورود کتاب فقط با فهرست مطالب — بدون هیچ سوالی (ساختار خالی مجاز)."""
+
+    def _import(self, auth_client, book: dict) -> dict:
+        r = auth_client.post("/api/v1/resources/import-book", json=book)
+        assert r.status_code == 200, r.text
+        return r.json()["data"]
+
+    def test_full_toc_without_questions(self, auth_client):
+        """مبحث فقط با زیرمبحث و بدون هیچ سوالی؛ زیرمبحث بدون کلید questions."""
+        book = {
+            "title": f"شیمی دهم — فقط فهرست — {uuid.uuid4().hex[:6]}",
+            "subject": "شیمی",
+            "chapters": [
+                {"title": "فصل کیهان", "topics": [
+                    {"title": "زنجیره غذایی", "subtopics": [
+                        {"title": "ماده و نقش آن"},
+                    ]},
+                    {"title": "سوخت"},
+                ]},
+                {"title": "فصل آب", "topics": [
+                    {"title": "هیدروکربن‌ها", "questions": [], "subtopics": [
+                        {"title": "آلکان‌ها", "questions": []},
+                    ]},
+                ]},
+            ],
+        }
+        stats = self._import(auth_client, book)
+        assert stats["chapters"] == 2
+        assert stats["topics"] == 3
+        assert stats["subtopics"] == 2
+        assert stats["questions"] == 0
+
+    def test_toc_only_structure_visible_in_subject_tree(self, auth_client):
+        """ساختار فقط‌فهرست در درخت درس با question_count صفر دیده می‌شود."""
+        book = {
+            "title": f"فیزیک — فهرست خالی — {uuid.uuid4().hex[:6]}",
+            "subject": "حسابان",  # درس موجود در seed
+            "chapters": [{"title": f"ف۱-{uuid.uuid4().hex[:6]}", "topics": [
+                {"title": f"م۱-{uuid.uuid4().hex[:6]}", "subtopics": [{"title": "ز۱"}]},
+            ]}],
+        }
+        stats = self._import(auth_client, book)
+        rid = stats["resource_id"]
+        hits = []
+        for sbj in [x for x in auth_client.get("/api/v1/subjects").json()["data"]
+                    if x["name"] == book["subject"]]:
+            rows = auth_client.get(f"/api/v1/subjects/{sbj['id']}/chapters").json()["data"]
+            hits += [c for c in rows if c["title"] == book["chapters"][0]["title"]]
+        (ch,) = hits
+        topics = auth_client.get(f"/api/v1/chapters/{ch['id']}/topics").json()["data"]
+        (tp,) = [t for t in topics if t["title"] == book["chapters"][0]["topics"][0]["title"]]
+        assert tp["title"].startswith("م۱")  # فقط عنوان، در درخت درس ثبت شده
+        # سوالات منبع: خالی
+        qs = auth_client.get(f"/api/v1/resources/{rid}/questions").json()["data"]
+        assert qs == []
+
+    def test_chapter_without_topics_allowed(self, auth_client):
+        """فصل فقط با عنوان (بدون مبحث) هم مجاز است — گره خالی درخت."""
+        book = {
+            "title": f"فصل خالی — {uuid.uuid4().hex[:6]}",
+            "chapters": [{"title": f"فص-جانبی-{uuid.uuid4().hex[:4]}"}],
+        }
+        stats = self._import(auth_client, book)
+        assert stats["chapters"] == 1
+        assert stats["topics"] == 0
+        assert stats["questions"] == 0
+
+    def test_regression_with_questions_still_works(self, auth_client):
+        """رگرسیون: کتاب با سوال واقعی مثل قبل وارد می‌شود."""
+        book = {
+            "title": f"ریاضی — با سوال — {uuid.uuid4().hex[:6]}",
+            "chapters": [{"title": "ف۱", "topics": [{
+                "title": "م۱",
+                "questions": [
+                    {"number": "1", "answer": "2", "difficulty": "آسان"},
+                    {"number": "2", "answer": "3"},
+                ],
+            }]}],
+        }
+        stats = self._import(auth_client, book)
+        assert stats["questions"] == 2
+
+    def test_incomplete_question_missing_answer_rejected(self, auth_client):
+        """سوال ناقص (بدون answer) → خطای واضح فارسی."""
+        book = {
+            "title": f"ناقص — {uuid.uuid4().hex[:6]}",
+            "chapters": [{"title": "ف۱", "topics": [{
+                "title": "م۱",
+                "questions": [{"number": "1"}],
+            }]}],
+        }
+        r = auth_client.post("/api/v1/resources/import-book", json=book)
         assert r.status_code == 422
+        assert "پاسخ صحیح" in r.json()["error"]["message"]
+
+    def test_questions_not_a_list_rejected(self, auth_client):
+        """questions به‌شکل غیرفهرست → خطای واضح فارسی."""
+        book = {
+            "title": f"غیرفهرست — {uuid.uuid4().hex[:6]}",
+            "chapters": [{"title": "ف۱", "topics": [{
+                "title": "م۱", "questions": "سوال اول",
+            }]}],
+        }
+        r = auth_client.post("/api/v1/resources/import-book", json=book)
+        assert r.status_code == 422
+        assert "فهرست" in r.json()["error"]["message"]

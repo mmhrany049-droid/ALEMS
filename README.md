@@ -17,7 +17,7 @@ bash scripts/run.sh
 ```
 
 - وب‌اپلیکیشن: **http://localhost:5173**
-- API: **http://localhost:8000** (اسناد تعاملی: `/api/docs`)
+- API: **http://localhost:8010** (اسناد تعاملی: `/api/docs`)
 - ثبت‌نام کن، پروفایل را کامل کن و اولین کتاب تست را وارد کن — کمتر از ۵ دقیقه!
 
 ### اجرای تست‌ها
@@ -104,7 +104,7 @@ ALEMS/
 - از **تنظیمات ← داده‌ها و پشتیبان**: دکمه «پشتیبان جدید» (رمز اختیاری)
 - یا با API:
 ```bash
-curl -X POST localhost:8000/api/v1/backup/create -H "Authorization: Bearer $TOKEN" \
+curl -X POST localhost:8010/api/v1/backup/create -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"encrypted": false}'
 ```
 
@@ -117,7 +117,7 @@ curl -X POST localhost:8000/api/v1/backup/create -H "Authorization: Bearer $TOKE
 
 ### بازگردانی
 ```bash
-curl -X POST localhost:8000/api/v1/backup/restore -H "Authorization: Bearer $TOKEN" \
+curl -X POST localhost:8010/api/v1/backup/restore -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"backup_id": "alems-backup-20260920-120000.db", "confirm": true}'
 ```

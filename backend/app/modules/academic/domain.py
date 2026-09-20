@@ -102,9 +102,14 @@ def parse_importance(raw, default: int = 1) -> int:  # noqa: ANN001
 def _parse_questions(
     questions_raw, topic_path: str, seen_numbers: set[tuple[str, str]],
 ) -> list[ImportedQuestion]:
-    """پارس فهرست سوالات یک مبحث/زیرمبحث با اعتبارسنجی کامل."""
-    if not isinstance(questions_raw, list) or not questions_raw:
-        raise ValidationError(f"«{topic_path}» باید حداقل یک سوال داشته باشد.")
+    """پارس فهرست سوالات یک مبحث/زیرمبحث — فهرست خالی یا غایب مجاز است (ورود فقط‌فهرست).
+
+    اگر سوال داده شده باشد، همان قوانین قبلی برقرار است (number و answer الزامی).
+    """
+    if questions_raw is None or questions_raw == []:
+        return []
+    if not isinstance(questions_raw, list):
+        raise ValidationError(f"«questions» در «{topic_path}» باید یک فهرست باشد.")
     questions: list[ImportedQuestion] = []
     for q_raw in questions_raw:
         if not isinstance(q_raw, dict):
@@ -216,14 +221,14 @@ def parse_book_json(data: dict) -> ImportedBook:
         topics_raw = ch_raw.get("topics", [])
         questions_direct = ch_raw.get("questions")
         # پشتیبانی از فصل‌های بدون مبحث: سوالات مستقیم زیر فصل
-        if not topics_raw and isinstance(questions_direct, list):
+        if not topics_raw and isinstance(questions_direct, list) and questions_direct:
             topics_raw = [{"title": ch_title, "questions": questions_direct}]
-        if not isinstance(topics_raw, list) or not topics_raw:
-            raise ValidationError(f"فصل «{ch_title}» باید حداقل یک مبحث داشته باشد. «سوالات بدون مبحث معتبر وارد نمی‌شوند.»")
+        if not isinstance(topics_raw, list):
+            raise ValidationError(f"«topics» فصل «{ch_title}» باید یک فهرست باشد.")
+        # فصل بدون مبحث مجاز است (ورود فقط‌فهرست — قانون ۸.۵ فقط سوال بدون مبحث را ممنوع می‌کند)
         for ti, tp_raw in enumerate(topics_raw):
             chapter.topics.append(_parse_topic(tp_raw, ch_title, seen_numbers))
         book.chapters.append(chapter)
 
-    if book.question_count == 0:
-        raise ValidationError("کتاب باید حداقل یک سوال داشته باشد.")
+    # کتاب بدون سوال (فقط‌فهرست/TOC) مجاز است — سوالات بعداً تکمیل می‌شوند
     return book

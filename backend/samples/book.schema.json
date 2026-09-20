@@ -63,21 +63,23 @@
         "title": { "type": "string", "minLength": 1, "maxLength": 128 },
         "questions": {
           "type": "array",
-          "minItems": 1,
+          "description": "اختیاری — می‌تواند خالی یا غایب باشد (ورود فقط‌فهرست). اگر داده شود، هر سوال number و answer الزامی دارد.",
+          "default": [],
           "items": { "$ref": "#/definitions/question" }
         },
         "subtopics": {
           "type": "array",
-          "description": "زیرمباحث — فقط یک سطح (زیرمبحثِ زیرمبحث مجاز نیست)",
+          "description": "زیرمباحث — فقط یک سطح (زیرمبحثِ زیرمبحث مجاز نیست)؛ می‌توانند بدون سوال باشند",
           "items": {
             "type": "object",
-            "required": ["title", "questions"],
+            "required": ["title"],
             "additionalProperties": false,
             "properties": {
               "title": { "type": "string", "minLength": 1, "maxLength": 128 },
               "questions": {
                 "type": "array",
-                "minItems": 1,
+                "description": "اختیاری — می‌تواند خالی یا غایب باشد",
+                "default": [],
                 "items": { "$ref": "#/definitions/question" }
               }
             }

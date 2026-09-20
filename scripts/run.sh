@@ -31,9 +31,9 @@ fi
 cleanup() { kill ${BACK_PID:-} ${FRONT_PID:-} 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
-(cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000) &
+(cd backend && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8010) &
 BACK_PID=$!
-echo "✅ API:   http://localhost:8000   (سلامت: /health · اسناد: /api/docs)"
+echo "✅ API:   http://localhost:8010   (سلامت: /health · اسناد: /api/docs)"
 
 (cd frontend && npm run dev) &
 FRONT_PID=$!
