@@ -18,6 +18,22 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+
+from zoneinfo import ZoneInfo
+
+_TEHRAN = ZoneInfo("Asia/Tehran")
+
+
+def _tehran_today() -> dt.date:
+    """«امروز» بر مبنای Asia/Tehran — همان ساعت محصول (NFR منطقه زمانی).
+
+    dt.date.today() تاریخ محلیِ ماشین را می‌گیرد (در sandbox = UTC) و در
+    پنجرهٔ نیمه‌شب تهران (۲۰:۳۰ تا ۰۰:۰۰ UTC) یک روز از محصول عقب می‌افتد؛
+    نتیجه: override روی «دیروز» و انتظارات یک روز شیفت‌شده.
+    """
+    return dt.datetime.now(_TEHRAN).date()
+
+
 BASE = os.environ.get("ALEMS_BASE", "http://127.0.0.1:8010").rstrip("/")
 API = BASE + "/api/v1"
 PASS = "pass1234"
@@ -256,7 +272,7 @@ def section_tests() -> tuple[str, str]:
         return tok, rid
     st, r = req("POST", f"/reviews/{target['id']}/postpone", {"days": 2}, tok)
     new_sched = (r.get("data") or {}).get("scheduled_date") or ""
-    expected = (dt.date.today() + dt.timedelta(days=2)).isoformat()
+    expected = (_tehran_today() + dt.timedelta(days=2)).isoformat()
     check("V2-R04", "postpone", st == 200 and new_sched.startswith(expected),
          f"schedule جدید: {new_sched}")
 
@@ -309,7 +325,7 @@ def section_planning():
     check("V2-P01", "Today حداقل ۵ بخش سند ۷", st == 200 and len(sections) >= 5, f"{fa(len(sections))} بخش حاضر")
 
     # P02 — school override ظرفیت را عوض می‌کند
-    today_iso = dt.date.today().isoformat()
+    today_iso = _tehran_today().isoformat()
     st, r0 = req("GET", "/capacity", None, tok)
     before = (r0.get("data") or {}).get("available_minutes")
     st, r = req("POST", "/school-override",
@@ -322,12 +338,19 @@ def section_planning():
           f"{fa(before)} → {fa(after)} دقیقه")
 
     # P03 — task قفل‌شده بعد از regenerate می‌ماند
-    req("POST", "/plans/generate-week", {}, tok)
+    st, g = req("POST", "/plans/generate-week", {}, tok)
+    week_start = (g.get("data") or {}).get("week_start") or today_iso
+    ws = dt.date.fromisoformat(week_start)
     st, r = req("GET", f"/plans/{today_iso}", None, tok)
     tasks = (r.get("data") or {}).get("tasks") or []
-    if not tasks:  # امروز خالی بود → اولین روز دارای کار
-        for i in range(1, 7):
-            day = (dt.date.today() + dt.timedelta(days=i)).isoformat()
+    if not tasks:  # امروز خالی بود → دیگر روزهای هفتهٔ جاری
+        # allocate ممکن است کار را در هر روزِ هفته گذاشته باشد (مثلاً امروز با
+        # override ظرفیت صفر دارد و کارها به روزهای دیگر هفته رفته‌اند)؛ اول
+        # امروز به بعد، بعد روزهای گذشتهٔ همان هفته — معیار V2-P03 خودِ
+        # «ماندن قفل بعد از regenerate» است، نه روزِ خاصی.
+        week_days = [(ws + dt.timedelta(days=i)).isoformat() for i in range(7)]
+        ordered = [d for d in week_days if d > today_iso] + [d for d in week_days if d < today_iso]
+        for day in ordered:
             st, r = req("GET", f"/plans/{day}", None, tok)
             tasks = (r.get("data") or {}).get("tasks") or []
             if tasks:
@@ -348,14 +371,14 @@ def section_planning():
 
     # P04 — recovery همه را به فردا نمی‌ریزد
     st, r = req("POST", "/plans/recover", {}, tok)
-    tomorrow = (dt.date.today() + dt.timedelta(days=1)).isoformat()
+    tomorrow = (_tehran_today() + dt.timedelta(days=1)).isoformat()
     st2, r2 = req("GET", f"/plans/{tomorrow}", None, tok)
     tom_tasks = (r2.get("data") or {}).get("tasks") or []
     recovered = [t for t in tom_tasks if t.get("source") == "recovered"]
     # پخش شدن: یا هیچی به فردا نریخته (همه در همان روز/قبل انجام شده) یا تعداد معقول است
     week_counts = []
     for i in range(0, 7):
-        day = (dt.date.today() + dt.timedelta(days=i)).isoformat()
+        day = (_tehran_today() + dt.timedelta(days=i)).isoformat()
         _, rr = req("GET", f"/plans/{day}", None, tok)
         week_counts.append(len([t for t in ((rr.get("data") or {}).get("tasks") or []) if t.get("source") == "recovered"]))
     total_recovered = sum(week_counts)

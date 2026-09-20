@@ -11,11 +11,33 @@ from __future__ import annotations
 
 import datetime as dt
 
+from app.core.jalali import JalaliDate, gregorian_to_jalali, today_jalali
 from app.modules.planning import domain
+from app.modules.planning.service import week_of
 
 PASS = "pass1234"
-TODAY = dt.date(2026, 9, 20)          # یکشنبه ۱۴۰۵/۰۶/۲۹
-SATURDAY = dt.date(2026, 9, 19)       # هفته شنبه–جمعه
+# لنگر تقویم تست‌ها — مشتق از ساعت زنده‌ی خود اپ (Asia/Tehran)، دقیقاً همان
+# «امروز»/هفته‌ای که API محاسبه می‌کند. لیترال‌های ثابت (2026-09-20/«یکشنبه»/
+# «1405/06/29») با عبور از نیمه‌شب تهران کهنه شدند و مسیرهای زنده را به‌غلط
+# قرمز می‌کردند (time bomb روزانه/هفتگی). تست‌های خالص domain همچنان تاریخ
+# صریح پاس می‌دهند و خودسازگارند.
+_JTODAY = today_jalali()
+TODAY = _JTODAY.to_gregorian()
+SATURDAY, _WEEK_DAYS = week_of(TODAY)  # هفته شنبه–جمعه
+TOMORROW = TODAY + dt.timedelta(days=1)
+TODAY_ISO = TODAY.isoformat()
+SATURDAY_ISO = SATURDAY.isoformat()
+TOMORROW_ISO = TOMORROW.isoformat()
+J_TODAY = _JTODAY.format()
+J_TODAY_URL = J_TODAY.replace("/", "-")  # فرم مجاز در URL (اسلش در path → 404)
+J_TOMORROW = JalaliDate(*gregorian_to_jalali(TOMORROW.year, TOMORROW.month, TOMORROW.day)).format()
+J_SATURDAY = JalaliDate(*gregorian_to_jalali(SATURDAY.year, SATURDAY.month, SATURDAY.day)).format()
+TODAY_WEEKDAY_FA = _JTODAY.weekday_fa
+# لنگر deterministic تست recovery: «امروزِ» پین‌شده = فردای شروع هفته — سناریوی
+# «شنبه عقب‌افتاده» در هر روزِ اجرای تست معتبر می‌ماند (بی‌وابسته به ساعت زنده).
+RECOVER_ANCHOR = SATURDAY + dt.timedelta(days=1)
+RECOVER_ANCHOR_ISO = RECOVER_ANCHOR.isoformat()
+
 
 
 def _user(client, email: str) -> dict:
@@ -142,14 +164,17 @@ def test_domain_recommendation_has_reason():
 def test_capacity_default_and_blocks(client):
     u, _rid, _t = _setup(client, "pl1@example.com", taught=False, wrongs=())
     c0 = client.get("/api/v1/capacity", headers=_h(u)).json()["data"]
-    # یکشنبه بدون بلوک → پیش‌فرض ۲۴۰ × ۰٫۷ = ۱۶۸
-    assert c0["available_minutes"] == 168
-    assert c0["suggested_session_count"] == 2  # وعده ۶۰–۱۲۰ دقیقه
-    assert c0["weekday_fa"] == "یکشنبه"
+    # روز جاری بدون بلوک → پیش‌فرض domain (شنبه–پنجشنبه ۲۴۰×۰٫۷=۱۶۸، جمعه ۵۴۰×۰٫۷=۳۷۸)
+    exp_cap = domain.compute_capacity(
+        free_minutes=0, weekday=_JTODAY.weekday, has_blocks=False, done_7d=0, total_7d=0
+    )
+    assert c0["available_minutes"] == exp_cap["available_minutes"]
+    assert c0["suggested_session_count"] == exp_cap["suggested_session_count"]  # وعده ۶۰–۱۲۰ دقیقه
+    assert c0["weekday_fa"] == TODAY_WEEKDAY_FA
 
     r = client.put(
         "/api/v1/time-blocks",
-        json={"date": "1405/06/29", "blocks": [
+        json={"date": J_TODAY, "blocks": [
             {"kind": "school", "start": "07:00", "end": "14:00", "title": "مدرسه"},
             {"kind": "free", "start": "16:00", "end": "20:00"},
         ]},
@@ -160,18 +185,18 @@ def test_capacity_default_and_blocks(client):
     assert d["capacity"]["school_minutes"] == 420
     assert d["capacity"]["available_minutes"] == round(240 * 0.7)  # free صریح ۲۴۰
 
-    g = client.get("/api/v1/time-blocks?date=1405-06-29", headers=_h(u)).json()["data"]
+    g = client.get(f"/api/v1/time-blocks?date={J_TODAY_URL}", headers=_h(u)).json()["data"]
     assert len(g["blocks"]) == 2
     assert g["blocks"][0]["start"] == "07:00"
 
 
 def test_school_override_changes_capacity_v2_p02(client):
     u, _rid, _t = _setup(client, "pl2@example.com", taught=False, wrongs=())
-    before = client.get("/api/v1/capacity?date=2026-09-20", headers=_h(u)).json()["data"]
+    before = client.get(f"/api/v1/capacity?date={TODAY_ISO}", headers=_h(u)).json()["data"]
 
     r = client.post(
         "/api/v1/school-override",
-        json={"date": "2026-09-20", "blocks": [{"kind": "school", "start": "08:00", "end": "13:00"}]},
+        json={"date": TODAY_ISO, "blocks": [{"kind": "school", "start": "08:00", "end": "13:00"}]},
         headers=_h(u),
     )
     assert r.status_code == 200, r.text
@@ -183,12 +208,12 @@ def test_school_override_changes_capacity_v2_p02(client):
     assert after["capacity"]["school_minutes"] == 300
 
     # تعطیلی مدرسه → بلوک مدرسه حذف، ظرفیت برمی‌گردد
-    off = client.post("/api/v1/school-override", json={"date": "2026-09-20", "school_off": True}, headers=_h(u))
+    off = client.post("/api/v1/school-override", json={"date": TODAY_ISO, "school_off": True}, headers=_h(u))
     assert off.status_code == 200
     assert off.json()["data"]["capacity"]["available_minutes"] == before["available_minutes"]
 
     # خطا: override بدون بلوک و بدون تعطیلی
-    bad = client.post("/api/v1/school-override", json={"date": "2026-09-20"}, headers=_h(u))
+    bad = client.post("/api/v1/school-override", json={"date": TODAY_ISO}, headers=_h(u))
     assert bad.status_code == 422
     assert "بلوک‌های مدرسه" in bad.json()["error"]["message"]
 
@@ -200,13 +225,13 @@ def test_generate_week_pipeline_logged_and_suggested(client):
     r = client.post("/api/v1/plans/generate-week", json={}, headers=_h(u))
     assert r.status_code == 200, r.text
     d = r.json()["data"]
-    assert d["week_start"] == "2026-09-19"  # شنبه
+    assert d["week_start"] == SATURDAY_ISO  # شنبه
     assert [s["step"] for s in d["steps"]] == list(domain.PIPELINE)  # همان ترتیب، لاگ‌شده
 
     # مرور امروز (۵ غلط سررسید امروز) → task مرور
-    sunday = [x for x in d["days"] if x["date"] == "2026-09-20"][0]
-    assert sunday["tasks_count"] >= 1
-    plan = client.get("/api/v1/plans/2026-09-20", headers=_h(u)).json()["data"]
+    today_entry = [x for x in d["days"] if x["date"] == TODAY_ISO][0]
+    assert today_entry["tasks_count"] >= 1
+    plan = client.get(f"/api/v1/plans/{TODAY_ISO}", headers=_h(u)).json()["data"]
     kinds = {t["kind"] for t in plan["tasks"]}
     assert "review" in kinds
     rev = [t for t in plan["tasks"] if t["kind"] == "review"][0]
@@ -236,7 +261,7 @@ def test_generate_week_without_taught_still_runs(client):
 def test_locked_task_survives_regenerate_v2_p03(client):
     u, _rid, _t = _setup(client, "pl5@example.com")
     client.post("/api/v1/plans/generate-week", json={}, headers=_h(u))
-    plan = client.get("/api/v1/plans/2026-09-19", headers=_h(u)).json()["data"]
+    plan = client.get(f"/api/v1/plans/{SATURDAY_ISO}", headers=_h(u)).json()["data"]
     assert plan["tasks"], "شنبه باید کار تولیدشده داشته باشد"
     victim = plan["tasks"][0]
 
@@ -247,7 +272,7 @@ def test_locked_task_survives_regenerate_v2_p03(client):
 
     # کار دستی هم اضافه شود
     client.put(
-        "/api/v1/plans/2026-09-19",
+        f"/api/v1/plans/{SATURDAY_ISO}",
         json={"tasks": [
             {"id": victim["id"], "locked": True},
             {"title": "خلاصه‌نویسی تابع", "kind": "study", "minutes": 30},
@@ -260,7 +285,7 @@ def test_locked_task_survives_regenerate_v2_p03(client):
     assert r2.status_code == 200
     assert r2.json()["data"]["kept_locked"] >= 1
 
-    after = client.get("/api/v1/plans/2026-09-19", headers=_h(u)).json()["data"]
+    after = client.get(f"/api/v1/plans/{SATURDAY_ISO}", headers=_h(u)).json()["data"]
     ids = {t["id"] for t in after["tasks"]}
     locked_after = [t for t in after["tasks"] if t["locked"]]
     assert victim["id"] in ids                      # V2-P03: قفل‌شده ماند
@@ -274,7 +299,7 @@ def test_locked_task_survives_regenerate_v2_p03(client):
 def test_manual_override_operations(client):
     u, _rid, _t = _setup(client, "pl6@example.com")
     r0 = client.put(
-        "/api/v1/plans/1405-06-29",  # تاریخ شمسی هم قبول است
+        f"/api/v1/plans/{J_TODAY_URL}",  # تاریخ شمسی هم قبول است
         json={"tasks": [{"title": "تست جامع", "kind": "test", "minutes": 60, "count": 20}]},
         headers=_h(u),
     )
@@ -285,7 +310,7 @@ def test_manual_override_operations(client):
 
     # change count
     upd = client.put(
-        "/api/v1/plans/2026-09-20",
+        f"/api/v1/plans/{TODAY_ISO}",
         json={"tasks": [{"id": t1["id"], "count": 30, "minutes": 90}]},
         headers=_h(u),
     ).json()["data"]
@@ -310,30 +335,30 @@ def test_manual_override_operations(client):
 
     # move day
     mv = client.post(
-        "/api/v1/plans/2026-09-20/move-task",
-        json={"task_id": t1["id"], "to_date": "1405/06/30"},
+        f"/api/v1/plans/{TODAY_ISO}/move-task",
+        json={"task_id": t1["id"], "to_date": J_TOMORROW},
         headers=_h(u),
     )
     assert mv.status_code == 200, mv.text
-    assert mv.json()["data"]["date"] == "2026-09-21"
-    tues = client.get("/api/v1/plans/2026-09-21", headers=_h(u)).json()["data"]
+    assert mv.json()["data"]["date"] == TOMORROW_ISO
+    tues = client.get(f"/api/v1/plans/{TOMORROW_ISO}", headers=_h(u)).json()["data"]
     assert any(t["id"] == t1["id"] for t in tues["tasks"])
 
     # remove via PUT (لیست خالی = حذف همه)
-    rm = client.put("/api/v1/plans/2026-09-21", json={"tasks": []}, headers=_h(u)).json()["data"]
+    rm = client.put(f"/api/v1/plans/{TOMORROW_ISO}", json={"tasks": []}, headers=_h(u)).json()["data"]
     assert rm["removed"] >= 1 and rm["tasks"] == []
 
 
 def test_status_checkbox_flow(client):
     u, _rid, _t = _setup(client, "pl7@example.com")
     day = client.put(
-        "/api/v1/plans/2026-09-20", json={"tasks": [{"title": "مطالعه تابع", "minutes": 45}]}, headers=_h(u)
+        f"/api/v1/plans/{TODAY_ISO}", json={"tasks": [{"title": "مطالعه تابع", "minutes": 45}]}, headers=_h(u)
     ).json()["data"]
     tid = day["tasks"][0]["id"]
     r = client.post(f"/api/v1/plans/tasks/{tid}/status", json={"status": "done"}, headers=_h(u))
     assert r.json()["data"]["status"] == "done"
     # completion روی ظرفیت فردا اثر دارد (میانگین هفت روز اخیر)
-    cap = client.get("/api/v1/capacity?date=2026-09-21", headers=_h(u)).json()["data"]
+    cap = client.get(f"/api/v1/capacity?date={TOMORROW_ISO}", headers=_h(u)).json()["data"]
     assert cap["completion_rate"] == 1.0  # یک کار، یک انجام
 
 
@@ -344,26 +369,26 @@ def test_recovery_spreads_without_dump(client):
     # شنبه (دیروز) ۶ کار عقب‌افتاده — یکی مرور (بحرانی)
     tasks = [{"title": f"کار {i}", "minutes": 30} for i in range(5)]
     tasks.append({"title": "مرور حیاتی", "kind": "review", "minutes": 30, "reason_code": "review_critical"})
-    client.put("/api/v1/plans/2026-09-19", json={"tasks": tasks}, headers=_h(u))
+    client.put(f"/api/v1/plans/{SATURDAY_ISO}", json={"tasks": tasks}, headers=_h(u))
 
-    r = client.post("/api/v1/plans/recover", json={}, headers=_h(u))
+    r = client.post("/api/v1/plans/recover", json={"date": RECOVER_ANCHOR_ISO}, headers=_h(u))
     assert r.status_code == 200, r.text
     d = r.json()["data"]
     assert d["moved"] == 6
-    assert d["tomorrow_share"] == d["days"]["2026-09-20"]
+    assert d["tomorrow_share"] == d["days"][RECOVER_ANCHOR_ISO]
     assert d["tomorrow_share"] < d["moved"]          # V2-P04: همه روی فردا/امروز نمی‌ریزد
     assert sum(d["days"].values()) == 6
     assert len([v for v in d["days"].values() if v > 0]) >= 3  # پخش در روزهای باقی‌مانده
 
     # بحرانی اولویت روز زودتر را حفظ کرد
-    today_plan = client.get("/api/v1/plans/2026-09-20", headers=_h(u)).json()["data"]
-    titles = [t["title"] for t in today_plan["tasks"]]
+    anchor_plan = client.get(f"/api/v1/plans/{RECOVER_ANCHOR_ISO}", headers=_h(u)).json()["data"]
+    titles = [t["title"] for t in anchor_plan["tasks"]]
     assert "مرور حیاتی" in titles
-    moved = [t for t in today_plan["tasks"] if t["title"] == "مرور حیاتی"][0]
+    moved = [t for t in anchor_plan["tasks"] if t["title"] == "مرور حیاتی"][0]
     assert moved["source"] == "recovered"
 
     # شنبه خالی شد
-    sat = client.get("/api/v1/plans/2026-09-19", headers=_h(u)).json()["data"]
+    sat = client.get(f"/api/v1/plans/{SATURDAY_ISO}", headers=_h(u)).json()["data"]
     assert sat["tasks"] == []
 
 
@@ -380,8 +405,8 @@ def test_today_full_shape_v2_p01(client):
     # doc 11.1 — همه بخش‌ها
     for key in ("checkin", "capacity", "plan_items", "review_top", "upcoming_exams", "recommendation", "week_sparkline"):
         assert key in d, key
-    assert d["date"] == "2026-09-20" and d["date_jalali"] == "1405/06/29"
-    assert d["weekday_fa"] == "یکشنبه"
+    assert d["date"] == TODAY_ISO and d["date_jalali"] == J_TODAY
+    assert d["weekday_fa"] == TODAY_WEEKDAY_FA
     assert d["greeting"] in ("صبح بخیر", "ظهر بخیر", "عصر بخیر", "شب بخیر")
 
     assert d["checkin"]["today"] is None or isinstance(d["checkin"]["today"], dict)
@@ -389,7 +414,7 @@ def test_today_full_shape_v2_p01(client):
     assert d["upcoming_exams"] == []  # فاز ۶
     assert len(d["week_sparkline"]) == 7
     assert d["week_sparkline"][-1]["is_today"] is True
-    assert d["week"]["week_start"] == "2026-09-19" and len(d["week"]["days"]) == 7
+    assert d["week"]["week_start"] == SATURDAY_ISO and len(d["week"]["days"]) == 7
 
     # recommendation با reason فارسی (doc 08 §8.10)
     rec = d["recommendation"]
@@ -432,7 +457,7 @@ def test_priority_week_snapshot(client):
     r = client.get("/api/v1/priority/week", headers=_h(u))
     assert r.status_code == 200
     d = r.json()["data"]
-    assert d["from_snapshot"] is True and d["week_start"] == "2026-09-19"
+    assert d["from_snapshot"] is True and d["week_start"] == SATURDAY_ISO
     assert any(it["topic_id"] == topic_id for it in d["items"])
 
 
@@ -469,14 +494,14 @@ def test_planning_persian_errors(client):
 
     bad_time = client.put(
         "/api/v1/time-blocks",
-        json={"date": "2026-09-20", "blocks": [{"kind": "free", "start": "not-a-time", "end": "10:00"}]},
+        json={"date": TODAY_ISO, "blocks": [{"kind": "free", "start": "not-a-time", "end": "10:00"}]},
         headers=_h(u),
     )
     assert bad_time.status_code == 422 and bad_time.json()["error"]["message"] == "زمان را مثل ۰۸:۳۰ وارد کن."
 
     end_first = client.put(
         "/api/v1/time-blocks",
-        json={"date": "2026-09-20", "blocks": [{"kind": "free", "start": "18:00", "end": "10:00"}]},
+        json={"date": TODAY_ISO, "blocks": [{"kind": "free", "start": "18:00", "end": "10:00"}]},
         headers=_h(u),
     )
     assert end_first.status_code == 422

@@ -11,10 +11,16 @@ from __future__ import annotations
 
 import datetime as dt
 
+from app.core.jalali import today_jalali
 from app.modules.review import domain
 
 PASS = "pass1234"
-TODAY_TEHRAN = dt.date(2026, 9, 20)  # 1405/06/29 — لنگر تقویم تست‌ها
+# لنگر تقویم تست‌ها: از ساعت زنده خود اپ (Asia/Tehran) مشتق می‌شود — دقیقاً همان
+# «امروز» که API برای scheduled_date استفاده می‌کند. لیترال ثابت (مثلاً
+# dt.date(2026, 9, 20)) با عبور از نیمه‌شب تهران کهنه می‌شد و تست‌های مسیر زنده
+# را به‌غلط قرمز می‌کرد (time bomb). تست‌های خالص domain همچنان تاریخ را صریح
+# پاس می‌دهند و خودسازگارند.
+TODAY_TEHRAN = today_jalali().to_gregorian()
 
 
 def _user(client, email: str) -> dict:
@@ -164,7 +170,7 @@ def test_queue_built_automatically_by_finish_event(client):
     assert it["critical"] is False and it["wrong_count"] == 1  # هنوز یک غلط
     assert it["status"] == "pending"
     assert it["cycle_index"] == 0 and it["cycle_length"] == 4 and it["next_interval_days"] == 1
-    assert it["scheduled_date_jalali"] == "1405/06/29"
+    assert it["scheduled_date_jalali"] == today_jalali().format()
     assert it["book_title"] == "ریاضی جامع" and it["topic_title"] == "تابع"
     assert it["your_answer"] is None and it["correct_answer"] == "2"
 

@@ -2,12 +2,13 @@
  * Auth — ورود/ثبت‌نام با Framer Motion (phase 1).
  * - جابه‌جایی login/register با slide + fade
  * - خطای فارسی backend با shake ملایم
- * - موفقیت: success pulse + redirect (register → /onboarding)
+ * - موفقیت: toast + ریدایرکت فوری توسط GuestOnly (بر اساس کامل بودن پروفایل
+ *   به /onboarding یا /) — بدون setTimeout و بدون flash شدن صفحه Today.
  */
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '../../app/auth'
+import { useToast } from '../../app/toast'
 import { Spinner } from '../../components/Spinner'
 import { D, EASE_OUT } from '../../motion/variants'
 
@@ -15,14 +16,13 @@ type Mode = 'login' | 'register'
 
 export function AuthPage() {
   const { login, register } = useAuth()
-  const navigate = useNavigate()
+  const toast = useToast()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [success, setSuccess] = useState(false)
 
   const submit = async () => {
     setError(null)
@@ -30,13 +30,13 @@ export function AuthPage() {
     try {
       if (mode === 'login') {
         await login(email, password)
-        setSuccess(true)
-        setTimeout(() => navigate('/', { replace: true }), 450)
+        toast.success('ورود موفق — خوش آمدی!')
       } else {
         await register(email, password, fullName.trim() || null)
-        setSuccess(true)
-        setTimeout(() => navigate('/onboarding', { replace: true }), 450)
+        toast.success('حساب ساخته شد — بیا پروفایلت را کامل کنیم')
       }
+      // ریدایرکت دستی اینجا انجام نمی‌شود: به محض ذخیره user، GuestOnly
+      // کاربر را به مقصد درست می‌برد (پروفایل ناقص → onboarding).
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطایی پیش آمد؛ دوباره تلاش کنید.')
     } finally {
@@ -146,27 +146,11 @@ export function AuthPage() {
                 type="submit"
                 whileTap={{ scale: 0.98 }}
                 transition={{ duration: D.fast }}
-                disabled={busy || success}
+                disabled={busy}
                 className="mt-1 flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-body font-semibold text-white shadow-soft transition-opacity hover:opacity-90 disabled:opacity-60"
               >
-                {success ? (
-                  <motion.span
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: [0.5, 1.15, 1], opacity: 1 }}
-                    transition={{ duration: D.slow, ease: EASE_OUT }}
-                    className="flex items-center gap-2"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M4 12.5 9.5 18 20 6.5" />
-                    </svg>
-                    {mode === 'login' ? 'ورود موفق!' : 'حساب ساخته شد!'}
-                  </motion.span>
-                ) : (
-                  <>
-                    {busy && <Spinner size={16} />}
-                    {mode === 'login' ? 'ورود به ALEMS' : 'ساخت حساب'}
-                  </>
-                )}
+                {busy && <Spinner size={16} />}
+                {mode === 'login' ? 'ورود به ALEMS' : 'ساخت حساب'}
               </motion.button>
 
               <p className="text-center text-body-sm text-muted">

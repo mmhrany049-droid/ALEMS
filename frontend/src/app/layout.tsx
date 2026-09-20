@@ -12,6 +12,7 @@ import { useTheme } from './theme'
 import { useAuth } from './auth'
 import { todayJalali, formatJalaliLong, weekdayFa } from '../lib/dates'
 import { BackendStatus } from './BackendStatus'
+import { ErrorBoundary } from './ErrorBoundary'
 import { D, modal, backdrop } from '../motion/variants'
 
 const NAV: { to: string; label: string; icon: IconName; main?: boolean }[] = [
@@ -140,7 +141,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">{children}</AnimatePresence>
+          {/* ErrorBoundary با key=مسیر: خطای رندر یک صفحه فقط همان صفحه را
+              می‌گیرد و با تغییر route خودکار reset می‌شود — nav سالم می‌ماند
+              (NFR-5: هیچ صفحه سفید مرگباری، پیام فارسی). */}
+          <ErrorBoundary key={location.pathname}>
+            <AnimatePresence mode="wait">{children}</AnimatePresence>
+          </ErrorBoundary>
         </main>
       </div>
 

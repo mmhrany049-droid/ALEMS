@@ -18,6 +18,22 @@
 from __future__ import annotations
 
 import datetime as dt
+
+
+from zoneinfo import ZoneInfo
+
+_TEHRAN = ZoneInfo("Asia/Tehran")
+
+
+def _tehran_today() -> dt.date:
+    """«امروز» بر مبنای Asia/Tehran — همان ساعت محصول (NFR منطقه زمانی).
+
+    dt.date.today() تاریخ محلیِ ماشین را می‌گیرد (در sandbox = UTC) و در
+    پنجرهٔ نیمه‌شب تهران (۲۰:۳۰ تا ۰۰:۰۰ UTC) یک روز از محصول عقب می‌افتد؛
+    نتیجه: override روی «دیروز» و انتظارات یک روز شیفت‌شده.
+    """
+    return dt.datetime.now(_TEHRAN).date()
+
 import json
 import os
 import sys
@@ -177,7 +193,7 @@ def main() -> int:
     step(8, "صف مرور — غلط تازه در صف", st == 200 and len(q_items) >= 1, f"{fa(len(q_items))} آیتم")
 
     # ۹) آزمون آزمایشی ۷ روز دیگر
-    exam_date = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    exam_date = (_tehran_today() + dt.timedelta(days=7)).isoformat()
     st, r = req("POST", "/exams", {"title": "آزمون آزمایشی قلم‌چی", "kind": "mock",
                                    "scheduled_date": exam_date, "subjects": ["زیست شناسی", "ریاضی"]}, token)
     step(9, "ثبت آزمون نزدیک", st == 200, (r.get("data") or {}).get("scheduled_date_jalali", exam_date))

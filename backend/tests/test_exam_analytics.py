@@ -5,13 +5,13 @@ V2-A02 (export json شامل کتاب و attempt).
 """
 from __future__ import annotations
 
-import datetime as dt
 import io
 
-from tests.test_planning import PASS, _book, _h, _user  # noqa: F401 — helpers مشترک
+from tests.test_planning import (
+    J_SATURDAY, J_TODAY, J_TOMORROW, PASS, SATURDAY_ISO, TODAY_ISO, TOMORROW_ISO,
+    _book, _h, _user,
+)  # noqa: F401 — helpers مشترک
 
-TODAY = dt.date(2026, 9, 20)      # یکشنبه ۱۴۰۵/۰۶/۲۹
-TOMORROW = dt.date(2026, 9, 21)   # دوشنبه ۱۴۰۵/۰۶/۳۰
 
 
 def _setup(client, email, taught=True):
@@ -54,15 +54,15 @@ def test_exam_lifecycle_with_session(client):
 
     r = client.post("/api/v1/exams", headers=_h(u), json={
         "title": "آزمون آزمایشی ۱", "kind": "mock",
-        "scheduled_date": "1405/06/30", "planned_duration_minutes": 90,
+        "scheduled_date": J_TOMORROW, "planned_duration_minutes": 90,
         "subjects": ["ریاضی"], "planned_topic_ids": [topic_id],
     })
     assert r.status_code == 200, r.text
     e = r.json()["data"]
     assert e["status"] == "planned" and e["status_fa"] == "برنامه‌ریزی‌شده"
     assert e["kind_fa"] == "آزمایشی"
-    assert e["scheduled_date"] == "2026-09-21"          # شمسی در ورودی قبول است
-    assert e["scheduled_date_jalali"] == "1405/06/30"
+    assert e["scheduled_date"] == TOMORROW_ISO          # شمسی در ورودی قبول است
+    assert e["scheduled_date_jalali"] == J_TOMORROW
 
     lst = client.get("/api/v1/exams", headers=_h(u)).json()["data"]
     assert len(lst["items"]) == 1 and lst["upcoming_count"] == 1
@@ -159,7 +159,7 @@ def test_today_upcoming_exam_and_priority_boost(client):
     _session(client, u, rid, wrong=(1, 2, 3))  # learning state + review demand
 
     client.post("/api/v1/exams", headers=_h(u), json={
-        "title": "آزمون فردا", "kind": "mock", "scheduled_date": "1405/06/30",
+        "title": "آزمون فردا", "kind": "mock", "scheduled_date": J_TOMORROW,
         "planned_topic_ids": [topic_id],
     })
 
@@ -256,22 +256,22 @@ def test_analytics_slices(client):
 def test_reports_daily_weekly_monthly(client):
     u, rid, _t = _setup(client, "ex8@example.com")
     _session(client, u, rid, correct=(1, 2), wrong=(3, 4, 5))
-    day = client.put("/api/v1/plans/2026-09-20", headers=_h(u),
+    day = client.put(f"/api/v1/plans/{TODAY_ISO}", headers=_h(u),
                      json={"tasks": [{"title": "مطالعه تابع", "minutes": 45}]}).json()["data"]
     client.post(f"/api/v1/plans/tasks/{day['tasks'][0]['id']}/status", headers=_h(u), json={"status": "done"})
 
     d = client.get("/api/v1/reports/daily", headers=_h(u)).json()["data"]
-    assert d["kind"] == "daily" and d["date"] == "2026-09-20"
+    assert d["kind"] == "daily" and d["date"] == TODAY_ISO
     assert d["volume"]["study_minutes"] == 45
     assert d["accuracy"]["correct"] == 2 and d["accuracy"]["wrong"] == 3
     assert d["plan"]["tasks_done"] == 1 and d["plan"]["tasks_total"] == 1
     assert "coverage" in d and "accuracy" in d and "volume" in d  # سه بلوک جدا در گزارش
 
-    dj = client.get("/api/v1/reports/daily?date=1405/06/29", headers=_h(u)).json()["data"]
-    assert dj["date"] == "2026-09-20"  # شمسی قبول است
+    dj = client.get(f"/api/v1/reports/daily?date={J_TODAY}", headers=_h(u)).json()["data"]
+    assert dj["date"] == TODAY_ISO  # شمسی قبول است
 
     w = client.get("/api/v1/reports/weekly", headers=_h(u)).json()["data"]
-    assert w["kind"] == "weekly" and w["week_start"] == "2026-09-19" and len(w["days"]) == 7
+    assert w["kind"] == "weekly" and w["week_start"] == SATURDAY_ISO and len(w["days"]) == 7
     assert w["volume"]["attempts"] == 5
     assert w["previous_week"]["attempts_delta"] == 5
     assert "used_minutes" in w["capacity"]
@@ -296,7 +296,7 @@ def test_export_json_full_v2_a02(client):
     client.post("/api/v1/exams", headers=_h(u), json={"title": "آزمون من", "kind": "mock"})
 
     d = client.get("/api/v1/export/json", headers=_h(u)).json()["data"]
-    assert d["app"] == "ALEMS" and d["exported_at_jalali"] == "1405/06/29"
+    assert d["app"] == "ALEMS" and d["exported_at_jalali"] == J_TODAY
     assert d["profile"]["email"] == "ex9@example.com"
     assert d["settings"]["konkurs_penalty_k"] == 0.33
     # V2-A02 — کتاب‌ها و attemptها
@@ -340,7 +340,7 @@ def test_export_pdf_rtl(client):
     u, rid, _t = _setup(client, "ex11@example.com")
     _session(client, u, rid, correct=(1,), wrong=(2,))
     client.post("/api/v1/exams", headers=_h(u), json={
-        "title": "آزمون هفته", "kind": "mock", "scheduled_date": "2026-09-21",
+        "title": "آزمون هفته", "kind": "mock", "scheduled_date": TOMORROW_ISO,
     })
 
     for kind in ("weekly", "daily", "monthly", "summary"):
@@ -352,7 +352,7 @@ def test_export_pdf_rtl(client):
         assert len(r.content) > 2500
 
     # weekly با week_start شمسی
-    r = client.get("/api/v1/export/pdf?report=weekly&when=1405/06/28", headers=_h(u))
+    r = client.get(f"/api/v1/export/pdf?report=weekly&when={J_SATURDAY}", headers=_h(u))
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
 
     bad = client.get("/api/v1/export/pdf?report=nope", headers=_h(u))
