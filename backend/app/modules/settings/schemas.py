@@ -13,3 +13,4 @@ class SettingsUpdate(BaseModel):
     min_cluster: int | None = None
     konkurs_penalty_k: float | None = None
     streak_grace_days: int | None = None
+    auto_backup: bool | None = None  # doc 04 — پشتیبان خودکار در startup

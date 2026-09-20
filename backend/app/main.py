@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI):
     register_event_consumers()
     # doc 03 §3.4 — rewards هم مصرف‌کننده رویدادهاست (points ledger، فاز ۷)
     rewards_service.register_event_consumers()
+    # doc 04 — پشتیبان خودکار در startup اگر auto_backup روشن باشد (فاز 8)
+    from app.modules.backup.service import maybe_auto_backup
+    maybe_auto_backup()
     logger.info(
         "%s نسخه %s راه‌اندازی شد — backend :%d | DB: %s",
         settings.app_name,

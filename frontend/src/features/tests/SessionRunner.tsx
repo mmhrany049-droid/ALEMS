@@ -3,6 +3,7 @@
  * هر کلیک (درست/غلط/نزده) فوراً یک record می‌فرستد؛ تاریخچه سمت backend
  * append-only است (V2-T05) — اصلاح پاسخ = رکورد جدید، بازنویسی نمی‌شود.
  * پایان: untimed → مدت جلسه پرسیده می‌شود (پیش‌فرض از تایمر)؛ timed → همان planned.
+ * فاز ۸: success pulse روی «درست» (doc 07.4 #3) + حالت تمرکز (doc 07.7) + toast پایان جلسه (doc 07.9).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -13,8 +14,11 @@ import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Spinner } from '../../components/Spinner'
 import { BlockTypeBadge } from '../../components/BlockTypeBadge'
+import { FocusMode } from '../../components/FocusMode'
+import { Icon } from '../../components/Icon'
+import { useToast } from '../../app/toast'
 import { faDigits } from '../../lib/dates'
-import { D, EASE_OUT, staggerList, listItem } from '../../motion/variants'
+import { D, EASE_OUT, staggerList, listItem, successPulse } from '../../motion/variants'
 import { ScoreCard } from './ScoreCard'
 import { ModeChip, fmtClock } from './shared'
 
@@ -39,6 +43,10 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
   const [askDuration, setAskDuration] = useState(false)
   const [manualMin, setManualMin] = useState('')
   const [finished, setFinished] = useState<FinishOut | null>(null)
+  // فاز ۸: حالت تمرکز (doc 07.7) + success pulse (doc 07.4 #3)
+  const [focus, setFocus] = useState(false)
+  const [pulseId, setPulseId] = useState<string | null>(null)
+  const toast = useToast()
 
   // تیک‌ها (doc 04 Question Marking) — review/important/hard → صف مرور (doc 10 §10.1)
   const qc = useQueryClient()
@@ -62,7 +70,7 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
     return () => {
       alive = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks-exhaustive-deps
   }, [])
 
   const toggleMark = async (q: SessionQuestion, field: keyof ReviewMarks) => {
@@ -102,6 +110,12 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
           : { question_id: q.question_id, status: 'answered' as const, result: value }
       await api.post(`/test-sessions/${session.id}/records`, { items: [item] })
       setMarks((m) => ({ ...m, [q.question_id!]: value }))
+      if (value === 'correct' && q.question_id) {
+        // تیک سبز کوتاه — «ثبت تست درست» با successPulse (doc 07.4 #3)
+        const qid = q.question_id
+        setPulseId(qid)
+        window.setTimeout(() => setPulseId((cur) => (cur === qid ? null : cur)), 520)
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'ثبت نشد؛ دوباره تلاش کن.')
     } finally {
@@ -120,6 +134,8 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
       }
       const res = await api.post<FinishOut>(`/test-sessions/${session.id}/finish`, actual != null ? { actual_duration: actual } : {})
       setFinished(res)
+      setFocus(false)
+      toast.success('جلسه ثبت شد — نتیجه و تحلیل را در کارت نمره ببین.')
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'پایان جلسه ناموفق بود.')
     } finally {
@@ -139,8 +155,179 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
     )
   }
 
+  // سوال‌ها — یک بار تعریف؛ هم در چیدمان عادی و هم داخل FocusMode استفاده می‌شود
+  const questionsBlock = (
+    <motion.div variants={staggerList} initial="initial" animate="animate" className="flex flex-col gap-1.5">
+      {questions.map((q, idx) => {
+        const qid = q.question_id ?? `idx-${idx}`
+        const m = q.question_id ? marks[q.question_id] : undefined
+        const busy = pendingId === q.question_id
+        return (
+          <motion.div key={qid} variants={listItem}>
+            <Card
+              className={[
+                'flex flex-wrap items-center gap-2 p-3 transition-colors',
+                m === 'correct' ? 'border-success/40' : m === 'wrong' ? 'border-danger/40' : m === 'blank' ? 'border-warning/40' : '',
+              ].join(' ')}
+            >
+              <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-body-sm font-bold text-muted">
+                {faDigits(q.number ?? idx + 1)}
+                <AnimatePresence>
+                  {pulseId === qid && (
+                    <motion.span
+                      key="pulse"
+                      variants={successPulse}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      className="absolute inset-0 flex items-center justify-center rounded-full bg-success text-white"
+                      aria-hidden="true"
+                    >
+                      <Icon name="check" size={16} />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </span>
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <span className="truncate text-body-sm font-semibold">{q.topic_title || '—'}</span>
+                {q.block_type && <BlockTypeBadge type={q.block_type} />}
+                {q.difficulty != null && (
+                  <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted">
+                    سختی {faDigits(q.difficulty)}
+                  </span>
+                )}
+                {q.question_id && (
+                  <span className="flex items-center gap-1" title="تیک‌ها — وارد صف مرور می‌شوند">
+                    {(
+                      [
+                        { key: 'review', label: 'مرور', on: 'border-review/40 bg-review-soft text-review' },
+                        { key: 'important', label: 'مهم', on: 'border-primary/40 bg-primary-soft text-primary' },
+                        { key: 'hard', label: 'سخت', on: 'border-warning/40 bg-warning-soft text-warning' },
+                      ] as const
+                    ).map((mk) => {
+                      const on = q.question_id ? (qmarks[q.question_id]?.[mk.key] ?? false) : false
+                      return (
+                        <button
+                          key={mk.key}
+                          type="button"
+                          onClick={() => void toggleMark(q, mk.key)}
+                          aria-pressed={on}
+                          aria-label={`تیک ${mk.label}`}
+                          className={[
+                            'rounded-md border px-1.5 py-0.5 text-[11px] transition-colors',
+                            on ? mk.on : 'border-transparent text-muted hover:bg-surface-2',
+                          ].join(' ')}
+                        >
+                          {mk.label}
+                        </button>
+                      )
+                    })}
+                  </span>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {(
+                  [
+                    { key: 'correct', label: 'درست', active: 'bg-success text-white border-success', idle: 'border-border text-success hover:bg-success-soft' },
+                    { key: 'wrong', label: 'غلط', active: 'bg-danger text-white border-danger', idle: 'border-border text-danger hover:bg-danger-soft' },
+                    { key: 'blank', label: 'نزده', active: 'bg-warning text-white border-warning', idle: 'border-border text-warning hover:bg-warning-soft' },
+                  ] as const
+                ).map((opt) => (
+                  <motion.button
+                    key={opt.key}
+                    whileTap={{ scale: 0.94 }}
+                    transition={{ duration: D.fast }}
+                    disabled={busy}
+                    onClick={() => void mark(q, opt.key)}
+                    aria-pressed={m === opt.key}
+                    className={[
+                      'rounded-md border px-3 py-1.5 text-body-sm font-semibold transition-colors disabled:opacity-50',
+                      m === opt.key ? opt.active : opt.idle,
+                    ].join(' ')}
+                  >
+                    {opt.label}
+                  </motion.button>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )
+      })}
+    </motion.div>
+  )
+
+  const askDurationBlock = (
+    <AnimatePresence>
+      {askDuration && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+          <Card className="flex flex-wrap items-center justify-between gap-3 border-primary/40 p-4">
+            <p className="text-body-sm">
+              چقدر طول کشید؟ (تایمر <b>{fmtClock(elapsed)}</b> را نشان می‌دهد — می‌توانی دقیقه‌ای وارد کنی)
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                value={manualMin}
+                onChange={(e) => setManualMin(e.target.value)}
+                inputMode="numeric"
+                placeholder={String(Math.max(1, Math.round(elapsed / 60)))}
+                aria-label="مدت جلسه به دقیقه"
+                className="w-24 rounded-md border border-border bg-surface px-3 py-2 text-body-sm outline-none focus:border-primary"
+              />
+              <Button onClick={() => void doFinish()} disabled={finishing}>
+                {finishing ? <Spinner size={16} /> : null}
+                ثبت و پایان
+              </Button>
+              <Button variant="ghost" onClick={() => setAskDuration(false)}>
+                بی‌خیال
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
+  const finishButton = (
+    <Button variant="soft" onClick={() => (timed ? void doFinish() : setAskDuration(true))} disabled={finishing}>
+      {finishing ? <Spinner size={16} /> : null}
+      پایان جلسه
+    </Button>
+  )
+
   return (
     <div className="flex flex-col gap-4">
+      {/* حالت تمرکز (doc 07.7) — overlay تمام‌صفحه: ناوبری مخفی، فقط تایمر + سوال‌ها، خروج تأییدشده */}
+      <AnimatePresence>
+        {focus && (
+          <FocusMode
+            title={session.label || session.resource_title || 'جلسهٔ تست'}
+            subtitle={`${faDigits(done)} از ${faDigits(session.total_count)} ثبت شده`}
+            minutes={timed && session.planned_duration ? Math.max(1, Math.ceil(remaining! / 60)) : null}
+            onExit={() => setFocus(false)}
+          >
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-2">
+                <div
+                  className={[
+                    'rounded-lg px-4 py-2 text-title font-bold tabular-nums',
+                    remaining != null && remaining < 60 ? 'bg-danger-soft text-danger' : 'bg-surface text-ink',
+                  ].join(' ')}
+                >
+                  {remaining != null ? fmtClock(remaining) : fmtClock(elapsed)}
+                  <span className="mr-2 text-body-sm font-medium text-muted">{remaining != null ? 'باقی‌مانده' : 'سپری‌شده'}</span>
+                </div>
+                {finishButton}
+              </div>
+              {askDurationBlock}
+              {error && (
+                <p className="rounded-md bg-danger-soft px-3 py-2 text-body-sm text-danger" role="alert">{error}</p>
+              )}
+              {questionsBlock}
+            </div>
+          </FocusMode>
+        )}
+      </AnimatePresence>
+
       {/* هدر جلسه */}
       <Card className="sticky top-16 z-10 flex flex-wrap items-center justify-between gap-3 p-4">
         <div className="min-w-0">
@@ -159,142 +346,36 @@ export function SessionRunner({ initial, onExit }: { initial: SessionCreateOut; 
             </div>
             <div className="text-body-sm text-muted">{remaining != null ? 'باقی‌مانده' : 'زمان سپری‌شده'}</div>
           </div>
-          <Button
-            variant="soft"
-            onClick={() => (timed ? void doFinish() : setAskDuration(true))}
-            disabled={finishing}
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.94 }}
+            transition={{ duration: D.fast }}
+            onClick={() => setFocus(true)}
+            aria-label="حالت تمرکز"
+            title="حالت تمرکز — فقط تایمر و سوال‌ها (doc 07.7)"
+            className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-surface text-muted hover:text-ink"
           >
-            {finishing ? <Spinner size={16} /> : null}
-            پایان جلسه
-          </Button>
+            <Icon name="focus" size={18} />
+          </motion.button>
+          {finishButton}
         </div>
       </Card>
 
       {/* untimed: پرسش مدت بعد از finish (doc 09 §9.4) */}
-      <AnimatePresence>
-        {askDuration && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <Card className="flex flex-wrap items-center justify-between gap-3 border-primary/40 p-4">
-              <p className="text-body-sm">
-                چقدر طول کشید؟ (تایمر <b>{fmtClock(elapsed)}</b> را نشان می‌دهد — می‌توانی دقیقه‌ای وارد کنی)
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  value={manualMin}
-                  onChange={(e) => setManualMin(e.target.value)}
-                  inputMode="numeric"
-                  placeholder={String(Math.max(1, Math.round(elapsed / 60)))}
-                  aria-label="مدت جلسه به دقیقه"
-                  className="w-24 rounded-md border border-border bg-surface px-3 py-2 text-body-sm outline-none focus:border-primary"
-                />
-                <Button onClick={() => void doFinish()} disabled={finishing}>
-                  {finishing ? <Spinner size={16} /> : null}
-                  ثبت و پایان
-                </Button>
-                <Button variant="ghost" onClick={() => setAskDuration(false)}>
-                  بی‌خیال
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {askDurationBlock}
 
       {error && (
         <p className="rounded-md bg-danger-soft px-3 py-2 text-body-sm text-danger" role="alert">{error}</p>
       )}
 
       {/* سوال‌ها — ثبت سریع */}
-      <motion.div variants={staggerList} initial="initial" animate="animate" className="flex flex-col gap-1.5">
-        {questions.map((q, idx) => {
-          const qid = q.question_id ?? `idx-${idx}`
-          const m = q.question_id ? marks[q.question_id] : undefined
-          const busy = pendingId === q.question_id
-          return (
-            <motion.div key={qid} variants={listItem}>
-              <Card
-                className={[
-                  'flex flex-wrap items-center gap-2 p-3 transition-colors',
-                  m === 'correct' ? 'border-success/40' : m === 'wrong' ? 'border-danger/40' : m === 'blank' ? 'border-warning/40' : '',
-                ].join(' ')}
-              >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-body-sm font-bold text-muted">
-                  {faDigits(q.number ?? idx + 1)}
-                </span>
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <span className="truncate text-body-sm font-semibold">{q.topic_title || '—'}</span>
-                  {q.block_type && <BlockTypeBadge type={q.block_type} />}
-                  {q.difficulty != null && (
-                    <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted">
-                      سختی {faDigits(q.difficulty)}
-                    </span>
-                  )}
-                  {q.question_id && (
-                    <span className="flex items-center gap-1" title="تیک‌ها — وارد صف مرور می‌شوند">
-                      {(
-                        [
-                          { key: 'review', label: 'مرور', on: 'border-review/40 bg-review-soft text-review' },
-                          { key: 'important', label: 'مهم', on: 'border-primary/40 bg-primary-soft text-primary' },
-                          { key: 'hard', label: 'سخت', on: 'border-warning/40 bg-warning-soft text-warning' },
-                        ] as const
-                      ).map((mk) => {
-                        const on = q.question_id ? (qmarks[q.question_id]?.[mk.key] ?? false) : false
-                        return (
-                          <button
-                            key={mk.key}
-                            type="button"
-                            onClick={() => void toggleMark(q, mk.key)}
-                            aria-pressed={on}
-                            aria-label={`تیک ${mk.label}`}
-                            className={[
-                              'rounded-md border px-1.5 py-0.5 text-[11px] transition-colors',
-                              on ? mk.on : 'border-transparent text-muted hover:bg-surface-2',
-                            ].join(' ')}
-                          >
-                            {mk.label}
-                          </button>
-                        )
-                      })}
-                    </span>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {(
-                    [
-                      { key: 'correct', label: 'درست', active: 'bg-success text-white border-success', idle: 'border-border text-success hover:bg-success-soft' },
-                      { key: 'wrong', label: 'غلط', active: 'bg-danger text-white border-danger', idle: 'border-border text-danger hover:bg-danger-soft' },
-                      { key: 'blank', label: 'نزده', active: 'bg-warning text-white border-warning', idle: 'border-border text-warning hover:bg-warning-soft' },
-                    ] as const
-                  ).map((opt) => (
-                    <motion.button
-                      key={opt.key}
-                      whileTap={{ scale: 0.94 }}
-                      transition={{ duration: D.fast }}
-                      disabled={busy}
-                      onClick={() => void mark(q, opt.key)}
-                      aria-pressed={m === opt.key}
-                      className={[
-                        'rounded-md border px-3 py-1.5 text-body-sm font-semibold transition-colors disabled:opacity-50',
-                        m === opt.key ? opt.active : opt.idle,
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </motion.button>
-                  ))}
-                </div>
-              </Card>
-            </motion.div>
-          )
-        })}
-      </motion.div>
+      {questionsBlock}
 
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onExit}>
           انصراف (جلسه در تاریخچه می‌ماند)
         </Button>
-        <Button variant="soft" onClick={() => (timed ? void doFinish() : setAskDuration(true))} disabled={finishing}>
-          پایان جلسه
-        </Button>
+        {finishButton}
       </div>
     </div>
   )

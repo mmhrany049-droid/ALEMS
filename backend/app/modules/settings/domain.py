@@ -13,6 +13,7 @@ DEFAULT_MIN_CLUSTER = 8                   # doc 10 §10.3
 DEFAULT_PENALTY_K = 0.33                  # doc 08 §8.1
 DEFAULT_STREAK_GRACE_DAYS = 0             # doc 13.2 — از دست دادن روز → reset (grace=0 پیش‌فرض)
 STREAK_GRACE_MAX = 7
+DEFAULT_AUTO_BACKUP = False              # doc 04 — پشتیبان خودکار در startup
 
 
 def validate_settings(data: dict) -> list[str]:
@@ -43,6 +44,11 @@ def validate_settings(data: dict) -> list[str]:
         v = data["konkurs_penalty_k"]
         if not isinstance(v, (int, float)) or isinstance(v, bool) or not (0 <= float(v) <= 1):
             errors.append("ضریب جریمه کنکور باید عددی بین ۰ و ۱ باشد.")
+
+    if "auto_backup" in data and data["auto_backup"] is not None:
+        v = data["auto_backup"]
+        if not isinstance(v, bool):
+            errors.append("auto_backup باید true یا false باشد.")
 
     if "streak_grace_days" in data and data["streak_grace_days"] is not None:
         g = data["streak_grace_days"]

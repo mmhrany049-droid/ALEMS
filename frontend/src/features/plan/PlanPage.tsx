@@ -15,6 +15,7 @@ import type {
 import { Page } from '../../components/Page'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { ConfirmButton } from '../../components/ConfirmButton'
 import { EmptyState } from '../../components/EmptyState'
 import { Spinner } from '../../components/Spinner'
 import { Icon } from '../../components/Icon'
@@ -382,9 +383,13 @@ function BlocksCard({ blocks, loading, busy, onAdd, onRemove, onSchoolOff }: {
               <span className="text-body-sm font-medium">{faDigits(b.start)}–{faDigits(b.end)}</span>
               {b.title && <span className="truncate text-[11px] text-muted">{b.title}</span>}
               <span className="mr-auto text-[11px] text-muted">{faDigits(b.minutes)}د</span>
-              <button type="button" onClick={() => onRemove(b.id)} disabled={busy} className="px-1 text-muted hover:text-danger" aria-label="حذف بلوک">
-                ✕
-              </button>
+              <ConfirmButton
+                onConfirm={() => onRemove(b.id)}
+                busy={busy}
+                label="✕"
+                confirmLabel="بلوک حذف شود؟"
+                className="!px-2 !py-0.5 !text-[11px]"
+              />
             </li>
           ))}
         </ul>
@@ -652,9 +657,15 @@ function TaskRow({ task, mergeMode, selected, onToggleMerge, busy, onStatus, onL
             <Button variant="ghost" className="!px-2.5 !py-1 !text-[11px]" disabled={busy} onClick={() => { onStatus(task.id, task.status === 'skipped' ? 'pending' : 'skipped'); setOpen(false) }}>
               {task.status === 'skipped' ? 'برگرداندن از رد' : 'رد کردن'}
             </Button>
-            <Button variant="danger" className="!px-2.5 !py-1 !text-[11px]" disabled={busy || task.locked} onClick={() => { onDelete(task); setOpen(false) }}>
-              حذف
-            </Button>
+            {/* عملیات مخرب → تأیید دومرحله‌ای (doc 07.9) */}
+            <ConfirmButton
+              onConfirm={() => { onDelete(task); setOpen(false) }}
+              busy={busy}
+              disabled={busy || task.locked}
+              label="حذف"
+              confirmLabel="کار حذف شود؟"
+              className="!px-2.5 !py-1 !text-[11px]"
+            />
             {task.locked && <span className="text-[10px] text-warning">کار قفل‌شده حذف نمی‌شود — اول قفل را باز کن.</span>}
           </motion.div>
         )}

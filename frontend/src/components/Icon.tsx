@@ -20,6 +20,11 @@ export type IconName =
   | 'clock'
   | 'target'
   | 'more'
+  | 'alert'
+  | 'focus'
+  | 'download'
+  | 'shield'
+  | 'x'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5" />,
@@ -59,6 +64,17 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   more: <path d="M12 12h.01M12 5h.01M12 19h.01" />,
+  alert: <path d="M12 3 2.5 20h19zM12 9.5v5M12 17.5h.01" />,
+  focus: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    </>
+  ),
+  download: <path d="M12 3v12M7 10.5l5 5 5-5M4 21h16" />,
+  shield: <path d="M12 3l8 3v6c0 4.5-3.5 7.5-8 9-4.5-1.5-8-4.5-8-9V6z" />,
+  x: <path d="M6 6l12 12M18 6L6 18" />,
 }
 
 export function Icon({ name, size = 20, ...rest }: P) {

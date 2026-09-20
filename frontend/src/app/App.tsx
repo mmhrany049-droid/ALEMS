@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import { ThemeProvider } from './theme'
+import { ToastProvider } from './toast'
 import { AuthProvider, useAuth } from './auth'
 import { Layout } from './layout'
 import { Spinner } from '../components/Spinner'
@@ -66,6 +67,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <MotionConfig reducedMotion="user">
+          <ToastProvider>
           <BrowserRouter>
             <AuthProvider>
               <Routes>
@@ -111,6 +113,7 @@ export default function App() {
               </Routes>
             </AuthProvider>
           </BrowserRouter>
+          </ToastProvider>
         </MotionConfig>
       </ThemeProvider>
     </QueryClientProvider>

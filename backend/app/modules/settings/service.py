@@ -19,6 +19,7 @@ KEY_MAX_DAILY = "max_daily_review"
 KEY_MIN_CLUSTER = "min_cluster"
 KEY_PENALTY_K = "konkurs_penalty_k"
 KEY_STREAK_GRACE = "streak_grace_days"
+KEY_AUTO_BACKUP = "auto_backup"
 
 
 def get_all(db) -> dict:
@@ -36,6 +37,7 @@ def get_all(db) -> dict:
         "min_cluster": int(get_meta_value(db, KEY_MIN_CLUSTER, str(domain.DEFAULT_MIN_CLUSTER))),
         "konkurs_penalty_k": float(get_meta_value(db, KEY_PENALTY_K, str(domain.DEFAULT_PENALTY_K))),
         "streak_grace_days": int(get_meta_value(db, KEY_STREAK_GRACE, str(domain.DEFAULT_STREAK_GRACE_DAYS))),
+        "auto_backup": (get_meta_value(db, KEY_AUTO_BACKUP, "false") == "true"),
     }
 
 
@@ -55,6 +57,8 @@ def update(db, payload) -> dict:
         set_meta_value(db, KEY_MIN_CLUSTER, str(int(data["min_cluster"])))
     if "konkurs_penalty_k" in data and data["konkurs_penalty_k"] is not None:
         set_meta_value(db, KEY_PENALTY_K, str(float(data["konkurs_penalty_k"])))
+    if "auto_backup" in data and data["auto_backup"] is not None:
+        set_meta_value(db, KEY_AUTO_BACKUP, "true" if data["auto_backup"] else "false")
     if "streak_grace_days" in data and data["streak_grace_days"] is not None:
         set_meta_value(db, KEY_STREAK_GRACE, str(int(data["streak_grace_days"])))
     db.flush()

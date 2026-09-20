@@ -18,7 +18,7 @@
 | 5 | Planning & Today (capacity، generate-week، override) | ✅ انجام شد |
 | 6 | Exam & Analytics (exam center، متریک‌ها، export) | ✅ |
 | 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ✅ |
-| 8 | Polish & Hardening (focus mode، backup، AT کامل) | ⬜ |
+| 8 | Polish & Hardening (focus mode، backup، AT کامل) | ✅ |
 
 ---
 
@@ -96,9 +96,19 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — 154 تست: envelope، تقویم جلالی، health، auth، student، books، test engine، review، planner، exams، analytics، reports، export، rewards
+cd backend && .venv/bin/python -m pytest   # pytest — 163 تست: …، rewards، backup/restore
 cd frontend && npm run build               # type-check + build
+
+# روی سرور در حال اجرا (پورت 8010):
+python3 scripts/v2_acceptance.py           # چک‌لیست پذیرش doc 15 — هر ۲۶ ردیف (V2-B/T/R/P/A/U/S)
+python3 scripts/day_one_scenario.py        # سناریوی «روز اول دانش‌آموز» — ثبت‌نام تا پشتیبان‌گیری
 ```
+
+### نمونه‌ها
+
+- `examples/toc-only-book.json` — کتاب **فقط فهرست** (بدون هیچ سوال؛ شامل topic فقط با subtopics و
+  عنوان‌های «آزمون جامع»/«کنکور» برای استنتاج block_type) — با `POST /api/v1/resources/import-book`
+  یا drag/drop در صفحه «وارد کردن کتاب» واردش کنید.
 
 ---
 
@@ -221,6 +231,23 @@ cd frontend && npm run build               # type-check + build
 - [x] Frontend: کارت **«پیوستگی و پاداش»** در Today Hub (🔥 streak جاری/رکورد/امتیاز + نشان‌های اخیر + habit advice + aid) و دکمه **«چرا این پیشنهاد؟»** با panel بازشو (Framer Motion) روی کارت پیشنهاد؛ فیلد grace در تنظیمات
 - [x] Migration Alembic **0008_rewards** (points_ledger/streaks/badges/badge_awards)
 - [x] 154/154 pytest سبز · vite build سبز · آزمون زنده **۲۰/۲۰** · E2E از طریق پروکسی Vite
+
+---
+
+## معیار پذیرش فاز ۸ (خود-بررسی) — سخت‌سازی نهایی
+
+- [x] **Backup/Restore کامل** (doc 04 «دستی، خودکار، AES» + doc 06): `POST /backup/create` (برچسب + رمز AES اختیاری با pyzipper) · `GET /backup/list` (sidecar json — بدون باز کردن zip رمزدار) · `POST /backup/restore` · `GET /backup/download/{id}` (فایل خام zip)
+- [x] **V2-S01 — دور کامل**: snapshot با sqlite3 backup API (سازگار با WAL)؛ دادهٔ بعد از پشتیبان حذف و دادهٔ قبل از آن **بدون از دست رفتن** برمی‌گردد (userA + کتاب سالم، userB می‌پرد)؛ قبل از جایگزینی `PRAGMA integrity_check` + بررسی alembic_version
+- [x] **V2-S02 — تأیید دومرحله‌ای**: `confirm !== true` → ۴۲۲ با پیام فارسی actionable؛ در UI هم ConfirmButton دو مرحله‌ای (doc 07.9)
+- [x] AES: رمز غلط → ۴۲۲ «رمز فایل پشتیبان اشتباه است.» · retention خودکار (۲۰ نسخه آخر) · id سخت‌گیرانه در برابر path traversal · `auto_backup` در settings → پشتیبان خودکار در startup
+- [x] **Focus Mode** (doc 07.7): overlay تمام‌صفحه روی ناوبری — فقط تایمر + سوالات/کار جاری؛ در SessionRunner (دکمه تمرکز، سوال‌ها + ثبت سریع داخل overlay) و در Today Hub برای «کار جاری» (تایمر + «انجام شد»)؛ **خروج تأییدشده** (Escape هم تأیید می‌خواهد)
+- [x] **Motion طبق doc 07 تکمیل شد**: success pulse روی ثبت «درست» (الگوی #3 — قبلاً فقط تعریف بود)، **Toast غیرمزاحم** (doc 07.9 — موفقیت/خطا/اطلاع، auto-dismiss، حداکثر ۳)، checkbox انیمیشنی در کارهای امروز (doc 07.6 #3)
+- [x] **Today Hub دقیقاً با ترتیب doc 07.6**: ۱ سلام+check-in · ۲ ظرفیت · ۳ کارهای امروز · ۴ صف مرور ضروری · ۵ **آزمون نزدیک (بلوک مستقل)** · ۶ پیشنهاد روز با «چرا؟» · ۷ خلاصه ۷ روز (sparkline) — و «پیوستگی و پاداش» در انتها
+- [x] عملیات مخرب با تأیید دومرحله‌ای: حذف آزمون، حذف کار/بلوک برنامه، بازیابی پشتیبان (doc 07.9)
+- [x] **چک‌لیست doc 15 کامل پاس شد — ۲۶/۲۶** با `scripts/v2_acceptance.py` (V2-B01..05 · T01..05 · R01..04 · P01..04 · A01..02 · U01..04 · S01..02)
+- [x] `examples/toc-only-book.json` + `scripts/day_one_scenario.py` (سناریوی روز اول: ۱۳ گام سبز روی سرور واقعی)
+- [x] 163/163 pytest سبز · tsc + vite build سبز · چک زنده backup ۱۶/۱۶ · E2E از طریق پروکسی Vite
+- [x] **قبل از هر migration از V1: پشتیبان بگیر** (doc 17) — از UI: تنظیمات → پشتیبان‌گیری، یا `POST /api/v1/backup/create`
 
 ---
 

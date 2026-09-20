@@ -256,6 +256,7 @@ export interface AppSettings {
   min_cluster: number
   konkurs_penalty_k: number
   streak_grace_days: number
+  auto_backup?: boolean
 }
 
 export interface ReviewMarks {
@@ -1044,4 +1045,33 @@ export interface BadgeRow {
 export interface BadgesOut {
   items: BadgeRow[]
   earned_count: number
+}
+
+// --- Backup & Restore (فاز ۸، doc 04/doc 06 §Backup) ---
+
+export interface BackupMeta {
+  id: string
+  label: string | null
+  encrypted: boolean
+  db_bytes: number | null
+  size_bytes: number | null
+  alembic_revision: string | null
+  student_id: string | null
+  app: string
+  version: string
+  created_at: string
+  created_at_jalali: string
+  created_at_local: string
+}
+
+export interface BackupList {
+  items: BackupMeta[]
+  count: number
+  retention: number
+}
+
+export interface RestoreOut {
+  restored: BackupMeta
+  alembic_revision: string | null
+  message_fa: string
 }

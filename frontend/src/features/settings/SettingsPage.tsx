@@ -4,14 +4,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from '../../app/auth'
-import { api, ApiError } from '../../lib/api'
-import type { AppSettings } from '../../lib/schemas'
+import { useToast } from '../../app/toast'
+import { api, apiBlob, saveBlob, ApiError } from '../../lib/api'
+import type { AppSettings, BackupList, BackupMeta, RestoreOut } from '../../lib/schemas'
 import { Page } from '../../components/Page'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { ConfirmButton } from '../../components/ConfirmButton'
+import { Icon } from '../../components/Icon'
 import { Spinner } from '../../components/Spinner'
 import { faDigits } from '../../lib/dates'
+import { D, EASE_OUT } from '../../motion/variants'
 
 const toFa = (s: string | number) => faDigits(s)
 
@@ -125,6 +130,185 @@ function ReviewSettingsCard() {
   )
 }
 
+/**
+ * پشتیبان‌گیری و بازیابی (doc 04 «دستی، خودکار، AES»، doc 06 §Backup، V2-S01/S02).
+ * ساخت با label/رمز اختیاری · لیست · دانلود · بازیابی با تأیید دومرحله‌ای (doc 07.9).
+ */
+function BackupCard() {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const listQ = useQuery({ queryKey: ['backups'], queryFn: () => api.get<BackupList>('/backup/list') })
+  const settingsQ = useQuery({ queryKey: ['settings'], queryFn: () => api.get<AppSettings>('/settings') })
+
+  const [label, setLabel] = useState('')
+  const [password, setPassword] = useState('')
+  const [restoreId, setRestoreId] = useState<string | null>(null)
+  const [restorePw, setRestorePw] = useState('')
+
+  const createM = useMutation({
+    mutationFn: () =>
+      api.post<BackupMeta>('/backup/create', {
+        label: label.trim() || null,
+        password: password.trim() ? password.trim() : null,
+      }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['backups'] })
+      toast.success(`فایل پشتیبان ساخته شد — ${data.id}${data.encrypted ? ' (رمزدار 🔒)' : ''}`)
+      setLabel('')
+      setPassword('')
+    },
+  })
+  const autoM = useMutation({
+    mutationFn: (v: boolean) => api.put<AppSettings>('/settings', { auto_backup: v }),
+    onSuccess: (data) => {
+      qc.setQueryData(['settings'], data)
+      toast.success(data.auto_backup ? 'پشتیبان خودکار روشن شد — در هر راه‌اندازی سرور.' : 'پشتیبان خودکار خاموش شد.')
+    },
+  })
+  const restoreM = useMutation({
+    mutationFn: (id: string) =>
+      api.post<RestoreOut>('/backup/restore', { id, confirm: true, password: restorePw.trim() || null }),
+    onSuccess: (data) => {
+      setRestoreId(null)
+      setRestorePw('')
+      // کل داده عوض شده — همهٔ کش‌ها باطل شود (doc 15 V2-S01)
+      void qc.invalidateQueries()
+      toast.success(data.message_fa)
+    },
+  })
+  const download = async (id: string) => {
+    try {
+      const { blob, filename } = await apiBlob(`/backup/download/${id}`)
+      saveBlob(blob, filename)
+      toast.success('دانلود فایل پشتیبان شروع شد.')
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : 'دانلود ناموفق بود.')
+    }
+  }
+
+  const errMsg = (createM.error ?? restoreM.error ?? autoM.error) as ApiError | null
+  const items = listQ.data?.items ?? []
+  const inputCls = 'w-full rounded-md border border-border bg-surface px-3 py-2 text-body-sm outline-none focus:border-primary'
+
+  return (
+    <Card className="mt-4 p-4 md:p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Icon name="shield" size={18} />
+        <h2 className="text-title-sm font-bold">پشتیبان‌گیری و بازیابی</h2>
+      </div>
+      <p className="mb-4 text-body-sm text-muted">
+        از کل داده‌ها (کتاب‌ها، تست‌ها، برنامه، پاداش) فایل zip ساخته می‌شود؛ رمز AES اختیاری است.
+        بازیابی کل دادهٔ جاری را جایگزین می‌کند — با تأیید دومرحله‌ای.
+      </p>
+
+      {/* ساخت پشتیبان */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input className={inputCls} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="برچسب (اختیاری) — مثلاً قبل از کنکور" aria-label="برچسب پشتیبان" />
+        <input className={inputCls} dir="ltr" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="رمز AES (اختیاری، ≥۴)" aria-label="رمز پشتیبان" />
+        <Button onClick={() => createM.mutate()} disabled={createM.isPending} className="shrink-0">
+          {createM.isPending ? <Spinner size={14} /> : null}
+          ساخت پشتیبان
+        </Button>
+      </div>
+
+      {/* خودکار (doc 04) */}
+      <label className="mt-3 flex cursor-pointer items-center gap-2 text-body-sm">
+        <input
+          type="checkbox"
+          checked={settingsQ.data?.auto_backup ?? false}
+          onChange={(e) => autoM.mutate(e.target.checked)}
+          disabled={autoM.isPending || settingsQ.isPending}
+          className="accent-[var(--color-primary)]"
+        />
+        پشتیبان خودکار در راه‌اندازی سرور (بدون رمز)
+      </label>
+
+      {errMsg && (
+        <p className="mt-3 rounded-md bg-danger-soft px-3 py-2 text-body-sm text-danger" role="alert">{errMsg.message}</p>
+      )}
+
+      {/* لیست */}
+      <div className="mt-4">
+        {listQ.isPending ? (
+          <div className="flex justify-center py-3"><Spinner size={16} /></div>
+        ) : items.length === 0 ? (
+          <p className="rounded-lg bg-surface-2 px-3 py-3 text-body-sm text-muted">
+            هنوز پشتیبانی نداری — همین بالا «ساخت پشتیبان» را بزن.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {items.map((b) => (
+              <li key={b.id} className="rounded-lg border border-border bg-surface-2/50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-body-sm font-semibold">
+                    {faDigits(b.created_at_jalali)} <span className="text-[11px] font-normal text-muted">{b.created_at_local}</span>
+                  </span>
+                  {b.label && <span className="rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">{b.label}</span>}
+                  {b.encrypted && <span className="rounded-md bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">رمزدار 🔒</span>}
+                  <span className="text-[11px] text-muted">
+                    {b.size_bytes != null ? `${faDigits(Math.max(1, Math.round(b.size_bytes / 1024)))} کیلوبایت` : ''}
+                  </span>
+                  <div className="mr-auto flex items-center gap-1.5">
+                    <Button variant="ghost" className="!px-2.5 !py-1 !text-[11px]" onClick={() => void download(b.id)} ariaLabel="دانلود">
+                      <Icon name="download" size={13} /> دانلود
+                    </Button>
+                    <ConfirmButton
+                      onConfirm={() => restoreM.mutate(b.id)}
+                      busy={restoreM.isPending && restoreId === b.id}
+                      disabled={restoreM.isPending}
+                      label="بازیابی"
+                      confirmLabel="کل دادهٔ جاری جایگزین شود؟"
+                      className="!px-2.5 !py-1 !text-[11px]"
+                    />
+                  </div>
+                </div>
+                {/* رمز برای پشتیبان رمزدار — قبل از تأیید نهایی */}
+                <AnimatePresence>
+                  {restoreId === b.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto', transition: { duration: D.fast, ease: EASE_OUT } }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          className={inputCls}
+                          dir="ltr"
+                          type="password"
+                          value={restorePw}
+                          onChange={(e) => setRestorePw(e.target.value)}
+                          placeholder="رمز این پشتیبان"
+                          aria-label="رمز بازیابی"
+                        />
+                        <Button variant="ghost" className="shrink-0" onClick={() => { setRestoreId(null); setRestorePw('') }}>بستن</Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {b.encrypted && (
+                  <button
+                    type="button"
+                    onClick={() => { setRestoreId(restoreId === b.id ? null : b.id); setRestorePw('') }}
+                    className="mt-1 text-[11px] font-bold text-primary hover:underline"
+                  >
+                    {restoreId === b.id ? 'بستن ورود رمز' : 'بازیابی با رمز…'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {listQ.data && (
+          <p className="mt-2 text-[11px] text-muted">
+            {faDigits(listQ.data.count)} پشتیبان · نگهداری خودکار تا {faDigits(listQ.data.retention)} مورد آخر
+          </p>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 export function SettingsPage() {
   const { user, student, logout } = useAuth()
   const navigate = useNavigate()
@@ -187,6 +371,9 @@ export function SettingsPage() {
       </Card>
 
       <ReviewSettingsCard />
+
+      {/* پشتیبان‌گیری و بازیابی (doc 04، V2-S01/S02) */}
+      <BackupCard />
 
       <p className="mt-4 px-1 text-body-sm text-muted">
         زمان‌بندی (Asia/Tehran) و زبان (فارسی) همیشه فعال‌اند. گزینه‌های باز: حالت تیره، یادآوری check-in.

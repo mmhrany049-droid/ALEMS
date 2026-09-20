@@ -23,6 +23,7 @@ import type {
 import { Page } from '../../components/Page'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { ConfirmButton } from '../../components/ConfirmButton'
 import { EmptyState } from '../../components/EmptyState'
 import { Spinner } from '../../components/Spinner'
 import { faDigits } from '../../lib/dates'
@@ -391,14 +392,15 @@ function ExamCard({ exam, busy, onStart, onSubmit, onCancel, onDelete, onReopen,
               <Button onClick={onSubmit}>ثبت نتیجه</Button>
               <Button variant="soft" onClick={onCancel} disabled={busy}>لغو</Button>
               {exam.status === 'planned' && (
-                <Button variant="ghost" onClick={onDelete} disabled={busy}>حذف</Button>
+                /* عملیات مخرب → تأیید دومرحله‌ای (doc 07.9) */
+                <ConfirmButton onConfirm={onDelete} busy={busy} label="حذف" confirmLabel="آزمون حذف شود؟" />
               )}
             </>
           )}
           {exam.status === 'cancelled' && (
             <>
               <Button variant="soft" onClick={onReopen} disabled={busy}>برگشت به برنامه</Button>
-              <Button variant="ghost" onClick={onDelete} disabled={busy}>حذف</Button>
+              <ConfirmButton onConfirm={onDelete} busy={busy} label="حذف" confirmLabel="آزمون حذف شود؟" />
             </>
           )}
           {exam.status === 'finished' && (
