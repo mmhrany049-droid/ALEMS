@@ -16,6 +16,7 @@ import { AuthPage } from '../features/auth/AuthPage'
 import { OnboardingPage } from '../features/onboarding/OnboardingPage'
 import { TodayPage } from '../features/today/TodayPage'
 import { StudyPage } from '../features/study/StudyPage'
+import { ImportPage } from '../features/import/ImportPage'
 import { TestsPage } from '../features/tests/TestsPage'
 import { ReviewPage } from '../features/review/ReviewPage'
 import { PlanPage } from '../features/plan/PlanPage'
@@ -94,6 +95,7 @@ export default function App() {
                         <Routes>
                           <Route index element={<TodayPage key="today" />} />
                           <Route path="study" element={<StudyPage key="study" />} />
+                          <Route path="import" element={<ImportPage key="import" />} />
                           <Route path="tests" element={<TestsPage key="tests" />} />
                           <Route path="review" element={<ReviewPage key="review" />} />
                           <Route path="plan" element={<PlanPage key="plan" />} />

@@ -22,6 +22,7 @@ const NAV: { to: string; label: string; icon: IconName; main?: boolean }[] = [
   { to: '/plan', label: 'برنامه', icon: 'plan', main: true },
   { to: '/exams', label: 'آزمون‌ها', icon: 'exam' },
   { to: '/progress', label: 'پیشرفت', icon: 'progress' },
+  { to: '/import', label: 'وارد کردن کتاب', icon: 'book-open' },
   { to: '/settings', label: 'تنظیمات', icon: 'settings' },
 ]
 

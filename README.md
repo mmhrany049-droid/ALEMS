@@ -12,7 +12,7 @@
 |-----|-----|--------|
 | 0 | Foundation + Motion Shell | ✅ انجام شد |
 | 1 | Identity & Student (onboarding، check-in، taught) | ✅ انجام شد |
-| 2 | Books TOC-only (import فهرست، tree، block_type) | ⬜ |
+| 2 | Books TOC-only (import فهرست، tree، block_type) | ✅ انجام شد |
 | 3 | Test Engine (session، range/parity، past import) | ⬜ |
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ⬜ |
 | 5 | Planning & Today (capacity، generate-week، override) | ⬜ |
@@ -96,7 +96,7 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — 49 تست: envelope، تقویم جلالی، health، auth، student، taught
+cd backend && .venv/bin/python -m pytest   # pytest — 66 تست: envelope، تقویم جلالی، health، auth، student، taught، books/TOC-only
 cd frontend && npm run build               # type-check + build
 ```
 
@@ -127,6 +127,21 @@ cd frontend && npm run build               # type-check + build
 - [x] Frontend: صفحه Auth با motion، Onboarding ۴ مرحله‌ای، کارت check-in روی Today، پنل taught روی Study، خروج از Settings
 - [x] Migration Alembic 0002 (users/students/checkins/taught_topics) — فقط از طریق Alembic
 - [x] 49/49 pytest سبز · tsc + vite build سبز
+
+## معیار پذیرش فاز ۲ (خود-بررسی)
+
+- [x] `POST /resources/import-book` فایل **فقط‌فهرست بدون هیچ question** را موفق وارد می‌کند (questions غایب یا `[]` در هر سطحی)
+- [x] خطای «باید حداقل یک سوال داشته باشد» **دیگر وجود ندارد** (تست صریح روی متن پاسخ)
+- [x] topic بدون سوال مستقیم و فقط با subtopics → موفقیت
+- [x] block_type: `topic|mixed|chapter_exam|checkup|konkur|other` + **استنتاج از عنوان** (کنکور/آزمون/جامع/چکاپ/مخلوط)؛ مقدار صریح بر استنتاج غلبه می‌کند
+- [x] duplicate (title+publisher) → **409 فارسی با گزینه به‌روزرسانی** (`replace=true` جایگزین می‌کند؛ taught ردیف‌های قدیمی پاک می‌شود)
+- [x] `GET /resources` + `GET /resources/{id}/tree` (badge نوع بلوک، شمار سوال، taught و taught_state با حالت «قسمتی» — doc 08 §8.8)
+- [x] `GET /resources/import-book/schema` — راهنمای ساختار با مثال TOC-only
+- [x] اگر سوال باشد: `number` و `answer` الزامی (۴۲۲ فارسی مسیردار)؛ answer_keys نسخه‌دار (doc 05)
+- [x] taught cascade با درخت واقعی: parent→child آبشاری، `False` نواده‌ها را برنمی‌گرداند
+- [x] Frontend: صفحه Import (drag/drop JSON + paste + پیش‌نمایش شمارش + نمونه)، درخت کتاب در Study با badge، EmptyState با CTA
+- [x] Migration Alembic 0003 (resources/topics/questions/answer_keys + ایندکس حیاتی topics(resource_id, block_type))
+- [x] 66/66 pytest سبز · tsc + vite build سبز · آزمون زنده ۱۰/۱۰ از طریق پروکسی 5173
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

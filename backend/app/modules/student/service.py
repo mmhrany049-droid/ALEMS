@@ -4,7 +4,7 @@
 - check-in: upsert per Tehran day (no duplicates — phase-1 acceptance)
 - state: today/last/data_days
 - taught topics: upsert with (student_id, topic_id) uniqueness;
-  cascade rule in domain (real topic tree arrives with phase 2)
+  real parent→child cascade via academic.children_map_for (doc 08 §8.8, phase 2)
 """
 from __future__ import annotations
 
@@ -106,16 +106,33 @@ def get_taught(db, student: Student) -> list[TaughtTopicOut]:
 
 
 def set_taught(db, student: Student, body) -> list[TaughtTopicOut]:
-    """Upsert each (topic_id, taught). Phase 1: no topic tree yet (empty cascade map)."""
-    for it in body.items:
-        row = db.execute(
-            select(TaughtTopic).where(TaughtTopic.student_id == student.id, TaughtTopic.topic_id == it.topic_id)
-        ).scalar_one_or_none()
+    """Upsert (topic_id, taught) with real parent→child cascade (doc 08 §8.8).
+
+    Phase 2: children_map از درخت کتاب‌ها (academic.topics) ساخته می‌شود؛
+    topicهای خارج از درخت بدون فرزند می‌مانند → upsert ساده (سازگار با فاز ۱).
+    taught=True روی parent همه نوادگان را True می‌کند؛ False هیچ نواده‌ای را برنمی‌گرداند.
+    """
+    changes = [(it.topic_id, it.taught) for it in body.items]
+
+    from app.modules.academic.service import children_map_for  # module boundary: service→service
+
+    children_map = children_map_for(db, [tid for tid, _ in changes])
+
+    rows = db.execute(
+        select(TaughtTopic).where(TaughtTopic.student_id == student.id)
+    ).scalars().all()
+    existing_rows = {r.topic_id: r for r in rows}
+    existing = {r.topic_id: r.taught for r in rows}
+
+    result = domain.apply_taught(existing, changes, children_map)
+
+    now = dt.datetime.now(dt.timezone.utc)
+    for topic_id, taught in result.items():
+        row = existing_rows.get(topic_id)
         if row is None:
-            row = TaughtTopic(student_id=student.id, topic_id=it.topic_id, taught=it.taught)
-            db.add(row)
-        else:
-            row.taught = it.taught
-        row.updated_at = dt.datetime.now(dt.timezone.utc)
+            db.add(TaughtTopic(student_id=student.id, topic_id=topic_id, taught=taught, updated_at=now))
+        elif row.taught != taught:
+            row.taught = taught
+            row.updated_at = now
     db.flush()
     return get_taught(db, student)
