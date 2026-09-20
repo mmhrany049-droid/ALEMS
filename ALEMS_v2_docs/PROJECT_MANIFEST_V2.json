@@ -1,0 +1,48 @@
+{
+  "project": "ALEMS",
+  "version": "2.0.0",
+  "docs_version": "2.0.0",
+  "title_fa": "سامانه مدیریت زندگی تحصیلی و مسیر کنکور",
+  "based_on": ["ALEMS_1.0", "SS459_V1", "SS459_V2", "SS459_V2.1", "SS459_V3_selected"],
+  "default_backend_port": 8010,
+  "default_frontend_port": 5173,
+  "stack": {
+    "backend": ["Python", "FastAPI", "SQLAlchemy", "Pydantic", "Alembic", "SQLite"],
+    "frontend": ["React", "Vite", "TypeScript", "Tailwind", "Framer Motion", "Recharts"],
+    "calendar": "jalali",
+    "week_start": "saturday",
+    "timezone": "Asia/Tehran"
+  },
+  "non_negotiables": [
+    "toc_only_import",
+    "coverage_accuracy_volume_separated",
+    "taught_not_equal_learned",
+    "manual_override_wins",
+    "new_ui_not_v1_skin",
+    "framer_motion_required",
+    "backend_port_8010_default"
+  ],
+  "phases": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  "documents": [
+    "00_MASTER_README.md",
+    "01_VISION_SCOPE_V2.md",
+    "02_DOMAIN_REQUIREMENTS_V2.md",
+    "03_SYSTEM_ARCHITECTURE_V2.md",
+    "04_MODULE_CATALOG_V2.md",
+    "05_DATABASE_SPEC_V2.md",
+    "06_API_CONTRACT_V2.md",
+    "07_UI_UX_V2.md",
+    "08_BUSINESS_RULES_V2.md",
+    "09_BOOK_AND_TEST_ENGINE_V2.md",
+    "10_REVIEW_AND_LEARNING_V2.md",
+    "11_PLANNING_CAPACITY_V2.md",
+    "12_ANALYTICS_EXAM_GOALS_V2.md",
+    "13_REWARDS_BEHAVIOR_V2.md",
+    "14_CODING_AGENT_PROMPTS_V2.md",
+    "15_ACCEPTANCE_TESTS_V2.md",
+    "16_ROADMAP_PHASES_V2.md",
+    "17_MIGRATION_FROM_V1.md",
+    "18_OPEN_DECISIONS.md",
+    "PROJECT_MANIFEST_V2.json"
+  ]
+}
