@@ -255,9 +255,36 @@ export function TodayPage() {
                   ))}
                 </div>
               </div>
-              <p className="mt-3 text-[11px] leading-5 text-muted">
-                آزمون‌های نزدیک در فاز ۶ به اینجا می‌آیند{d.upcoming_exams.length > 0 ? '' : ' — فعلاً آزمونی ثبت نشده نیست.'}
-              </p>
+              {/* ۵) آزمون نزدیک — فاز ۶ (doc 07 §7.6) */}
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="text-[11px] font-semibold text-muted">آزمون نزدیک (۷ روز آینده)</p>
+                {d.upcoming_exams.length === 0 ? (
+                  <p className="mt-1 text-[11px] text-muted">فعلاً آزمونی ثبت نشده است.</p>
+                ) : (
+                  <div className="mt-1.5 space-y-1.5">
+                    {d.upcoming_exams.map((e) => (
+                      <div key={e.id} className="flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-body-sm font-semibold">{e.title}</p>
+                          <p className="text-[10px] text-muted">
+                            {e.kind_fa}
+                            {e.scheduled_date_jalali ? ` · ${faDigits(e.scheduled_date_jalali)}` : ''}
+                            {e.subjects.length > 0 ? ` · ${e.subjects.join('، ')}` : ''}
+                          </p>
+                        </div>
+                        <span
+                          className={[
+                            'shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold',
+                            e.days_until <= 1 ? 'bg-danger-soft text-danger' : 'bg-primary-soft text-primary',
+                          ].join(' ')}
+                        >
+                          {e.days_until === 0 ? 'امروز!' : e.days_until === 1 ? 'فردا' : `${faDigits(e.days_until)} روز دیگر`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Card>
           </motion.div>
         </div>

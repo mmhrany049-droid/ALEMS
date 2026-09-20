@@ -27,6 +27,8 @@ from app.core.jalali import (
 )
 from app.modules.academic.models import Resource, Topic
 from app.modules.activity.models import AttemptResult
+from app.modules.exam import domain as exam_domain
+from app.modules.exam.models import Exam
 from app.modules.planning import domain
 from app.modules.planning.models import (
     CapacitySnapshot,
@@ -602,7 +604,10 @@ def set_task_lock(db, student: Student, task_id: str, locked: bool) -> dict:
 
 # --- generate week (doc 11.3) ------------------------------------------------------------------
 
-def _priority_items(db, student: Student, week_days: list[dt.date], taught_ids: set[str]) -> list[dict]:
+def _priority_items(
+    db, student: Student, week_days: list[dt.date], taught_ids: set[str],
+    exam_topics: set[str] | None = None,
+) -> list[dict]:
     ws_date = week_days[0]
     we_date = week_days[-1]
     states = {
@@ -622,6 +627,7 @@ def _priority_items(db, student: Student, week_days: list[dt.date], taught_ids: 
     review_by_topic = {tid: int(n) for tid, n in review_rows if tid}
 
     candidates = (set(states.keys()) | set(review_by_topic.keys())) & taught_ids
+    exam_topics = exam_topics or set()
     items: list[dict] = []
     for tid in candidates:
         st = states.get(tid)
@@ -629,13 +635,20 @@ def _priority_items(db, student: Student, week_days: list[dt.date], taught_ids: 
         readiness = st.exam_readiness if st else 0.5
         weakness = bool(st.weakness) if st else False
         due = review_by_topic.get(tid, 0)
+        score = domain.priority_score(readiness, weakness, due)
+        reasons = domain.priority_reason_codes(readiness, weakness, due)
+        if tid in exam_topics:
+            # آزمون نزدیک روی این موضوع — boost ملایم + دلیل exam_prep (doc 11.3 مرحله ۲)
+            score = round(score + 0.2, 4)
+            if "exam_prep" not in reasons:
+                reasons.append("exam_prep")
         items.append(
             {
                 "topic_id": tid,
                 "topic_title": topic_title or "—",
                 "book_title": book_title,
-                "score": domain.priority_score(readiness, weakness, due),
-                "reason_codes": domain.priority_reason_codes(readiness, weakness, due),
+                "score": score,
+                "reason_codes": reasons,
                 "review_due": due,
                 "exam_readiness": round(readiness, 3),
                 "weakness": weakness,
@@ -666,10 +679,21 @@ def generate_week(db, student: Student, week_start_raw: str | None = None) -> di
     max_daily_review = settings["max_daily_review"]
     step("load_context", t0, week_start=_iso(ws), days=7, max_daily_review=max_daily_review)
 
-    # 2) exams — جدول exams در فاز ۶ می‌آید
+    # 2) exams — آزمون‌های هفته و ۱۴ روز آینده (doc 11.3 مرحله ۲، doc 12 §12.2)
     t0 = time.perf_counter()
-    exams: list = []
-    step("exams", t0, upcoming=0, note="phase-6")
+    exam_rows = db.execute(
+        select(Exam).where(
+            Exam.student_id == student.id,
+            Exam.status.in_(["planned", "in_progress"]),
+            Exam.scheduled_date.is_not(None),
+            Exam.scheduled_date >= ws,
+            Exam.scheduled_date <= days[-1] + dt.timedelta(days=7),
+        )
+    ).scalars().all()
+    exam_topics: set[str] = set()
+    for e in exam_rows:
+        exam_topics.update(e.planned_topic_ids or [])
+    step("exams", t0, upcoming=len(exam_rows), exam_topics=len(exam_topics))
 
     # 3) goals
     t0 = time.perf_counter()
@@ -728,7 +752,7 @@ def generate_week(db, student: Student, week_start_raw: str | None = None) -> di
 
     # 7) priority items
     t0 = time.perf_counter()
-    priority = _priority_items(db, student, days, taught_ids)
+    priority = _priority_items(db, student, days, taught_ids, exam_topics=exam_topics)
     now = _utcnow()
     snap = db.execute(
         select(PrioritySnapshot).where(PrioritySnapshot.student_id == student.id, PrioritySnapshot.week_start == ws)
@@ -1089,8 +1113,33 @@ def today_out(db, student: Student) -> dict:
     q = review_service.queue(db, student)
     review_top = q["items"][:5]
 
-    # آزمون نزدیک (بخش ۵) — جدول exams فاز ۶
-    upcoming_exams: list = []
+    # آزمون نزدیک (بخش ۵ — doc 07.6، فاز ۶ واقعی)
+    exam_rows = db.execute(
+        select(Exam)
+        .where(
+            Exam.student_id == student.id,
+            Exam.status.in_(["planned", "in_progress"]),
+            Exam.scheduled_date.is_not(None),
+            Exam.scheduled_date >= today,
+            Exam.scheduled_date <= today + dt.timedelta(days=7),
+        )
+        .order_by(Exam.scheduled_date)
+    ).scalars().all()
+    upcoming_exams: list = [
+        {
+            "id": e.id,
+            "title": e.title,
+            "kind": e.kind,
+            "kind_fa": exam_domain.KIND_LABELS_FA.get(e.kind, e.kind),
+            "status": e.status,
+            "status_fa": exam_domain.STATUS_LABELS_FA.get(e.status, e.status),
+            "scheduled_date": _iso(e.scheduled_date),
+            "scheduled_date_jalali": _jalali_str(e.scheduled_date),
+            "days_until": (e.scheduled_date - today).days,
+            "subjects": list(e.subjects or []),
+        }
+        for e in exam_rows
+    ]
 
     # پیشنهاد روز (بخش ۶)
     rec = recommendation_today(db, student, create=True)

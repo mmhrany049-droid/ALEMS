@@ -51,6 +51,40 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return body.data as T
 }
 
+/** دانلود باینری با احراز هویت (export excel/pdf) — filename از Content-Disposition */
+export async function apiBlob(path: string): Promise<{ blob: Blob; filename: string }> {
+  const token = getStoredToken()
+  const res = await fetch(`/api/v1${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  const ct = res.headers.get('content-type') ?? ''
+  if (!res.ok || ct.includes('application/json')) {
+    const body = (await res.json().catch(() => null)) as Envelope<unknown> | null
+    if (res.status === 401) clearToken()
+    throw new ApiError(
+      res.status,
+      body?.error?.code ?? 'DOWNLOAD_FAILED',
+      body?.error?.message ?? 'دانلود ناموفق بود.',
+      body?.error?.details ?? {},
+    )
+  }
+  const cd = res.headers.get('content-disposition') ?? ''
+  const m = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(cd)
+  const filename = m ? decodeURIComponent(m[1]) : 'download'
+  return { blob: await res.blob(), filename }
+}
+
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 4000)
+}
+
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, data?: unknown) =>

@@ -16,7 +16,7 @@
 | 3 | Test Engine (session، range/parity، past import) | ✅ انجام شد |
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ✅ انجام شد |
 | 5 | Planning & Today (capacity، generate-week، override) | ✅ انجام شد |
-| 6 | Exam & Analytics (exam center، متریک‌ها، export) | ⬜ |
+| 6 | Exam & Analytics (exam center، متریک‌ها، export) | ✅ |
 | 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ⬜ |
 | 8 | Polish & Hardening (focus mode، backup، AT کامل) | ⬜ |
 
@@ -96,7 +96,7 @@ TIMEZONE=Asia/Tehran
 ### تست‌ها
 
 ```bash
-cd backend && .venv/bin/python -m pytest   # pytest — 86 تست: envelope، تقویم جلالی، health، auth، student، taught، books/TOC-only، test engine
+cd backend && .venv/bin/python -m pytest   # pytest — 138 تست: envelope، تقویم جلالی، health، auth، student، books، test engine، review، planner، exams، analytics، reports، export
 cd frontend && npm run build               # type-check + build
 ```
 
@@ -189,6 +189,24 @@ cd frontend && npm run build               # type-check + build
 - [x] تاریخ شمسی در URL و body (`/plans/1405-06-29` ≡ `/plans/2026-09-20`)؛ پیام‌های خطا فارسی
 - [x] Migration Alembic 0006 (goals/time_blocks/capacity_snapshots/plan_tasks/plan_runs/priority_snapshots/recommendations)
 - [x] 126/126 pytest سبز · vite build سبز · آزمون زنده ۶۷/۶۷ روی سرور واقعی
+
+## معیار پذیرش فاز ۶ (خود-بررسی)
+
+- [x] **Exam Center کامل** (doc 12.2): `CRUD /exams` + `POST /exams/{id}/start|submit` + `GET /exams/{id}/result`؛ چرخه planned → in_progress → finished (+ cancelled با امکان بازگشت)؛ finished سند تغییرناپذیر است؛ انواع mock/school_subject/free با برچسب فارسی
+- [x] **ثبت نتیجه دو مسیره**: merge چند جلسه تست (session_ids) یا شمارش دستی (total/correct/wrong/unanswered + مدت واقعی)؛ `actual_topic_ids` از جلسات پر می‌شود
+- [x] **scoring کنکوری/بدون جریمه همیشه جدا** (doc 08 §8.1): `percent_konkur = (C − k·W)/T·100` و `percent_no_penalty = C/T·100` با k از settings (پیش‌فرض ۰٫۳۳)؛ T=0 → null؛ **درصد منفی نمایش داده می‌شود** (نمایش ۰ نمی‌شود)
+- [x] **V2-A01 (قید ۲) در همه‌جا**: `GET /analytics/overview` همیشه سه بلوک جدا `coverage` (از ابتدا تا امروز) / `accuracy` (پنجره) / `volume` (پنجره) برمی‌گرداند — هرگز یک عدد قاطی؛ T از ستون‌های جلسه می‌آید پس «بی‌پاسخ ≠ واردنشده ≠ خالی» در دقت گم نمی‌شود (قید ۳)
+- [x] **برش‌های تحلیل** (doc 12.1): by-subject · by-chapter · by-topic (order=volume|accuracy|readiness) · difficulty · mistakes (انواع خطا، پرتکرارترین مباحث غلط، سوالات با غلط تکراری، یادداشت‌های بدون برچسب) — در هر ردیف هم سه متریک جدا
+- [x] **هدف کنکور فقط کیفی** (doc 12.4): level_fa + message_fa بر اساس پوشش/دقت — بدون هیچ ادعای رتبه یا تراز دقیق
+- [x] **گزارش‌ها** (doc 12.5): `GET /reports/daily?date=` · `weekly?week_start=` · `monthly?month=` (شمسی یا میلادی)؛ هفتگی = ۷ روز + delta هفته قبل + مصرف ظرفیت + آزمون‌های هفته؛ ماهانه = هفته‌های clip شده
+- [x] **Export**: `GET /export/json` کامل (V2-A02 — books با درخت و سوالات + attempts همیشه داخلش) · `/export/excel` هفت شیت فارسی RTL (openpyxl) · `/export/pdf?report=daily|weekly|monthly|summary` راست‌به‌چپ با فونت **وزیرمتن embed** (reportlab + arabic-reshaper + python-bidi) — دانلود با Content-Disposition
+- [x] **اتصال به planner**: مرحله exams در generate-week واقعی شد — مباحث آزمون‌های پیش‌رو در اولویت **boost (+۰٫۲، reason=exam_prep)** می‌گیرند؛ بخش ۵ «امروز» = آزمون‌های نزدیک (≤۷ روز) با days_until (doc 07 §7.6)
+- [x] Frontend: **ExamsPage** (فرم ثبت، شروع/لغو/حذف، modal ثبت نتیجه دو تب‌ه، کارنامه با دو درصد جدا) + **ProgressPage** (سه کارت متریک جدا، ComposedChart روند روزانه، نمودار کتاب‌ها و سختی، لیست مباحث سه‌متریک، کارت هفتگی، هدف کیفی، تحلیل خطاها، دکمه‌های دانلود JSON/Excel/PDF) با Recharts + Framer Motion
+- [x] رویداد `EXAM_FINISHED` بعد از submit منتشر می‌شود؛ پیام‌های خطای فارسی («آزمون پیدا نشد.»، «عنوان آزمون نمی‌تواند خالی باشد.»، …)
+- [x] Migration Alembic **0007_exams** (تنها جدول جدید — analytics/report/export ویوی محاسباتی‌اند)
+- [x] 138/138 pytest سبز · vite build سبز · آزمون زنده **۴۹/۴۹** روی سرور واقعی (+ E2E از طریق پروکسی Vite)
+
+---
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

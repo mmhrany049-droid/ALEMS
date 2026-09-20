@@ -560,7 +560,7 @@ export interface TodayOut {
   plan_counts: { total: number; done: number; locked: number }
   review_top: ReviewItemOut[]
   review_due_count: number
-  upcoming_exams: unknown[]
+  upcoming_exams: UpcomingExam[]
   recommendation: RecommendationOut | null
   week_sparkline: SparklineDay[]
   week: { week_start: string; week_start_jalali: string; days: TodayWeekDay[] }
@@ -590,3 +590,387 @@ export interface TimeBlockIn {
   end: string | number
   title?: string
 }
+
+// ---------------------------------------------------------------------------
+// Phase 6 — Exam Center · Analytics · Reports · Export (doc 12, doc 08 §8.1)
+// V2-A01: coverage / accuracy / volume همیشه سه بلوک جدا — هرگز یک عدد قاطی.
+// ---------------------------------------------------------------------------
+
+export type ExamKind = 'mock' | 'school_subject' | 'free'
+export type ExamStatus = 'planned' | 'in_progress' | 'finished' | 'cancelled'
+
+export interface ExamScoring {
+  total_count: number
+  correct_count: number
+  wrong_count: number
+  unanswered_count: number
+  not_entered_count: number
+  actual_duration_seconds: number | null
+  penalty_k: number
+  percent_konkur: number | null
+  percent_no_penalty: number | null
+}
+
+export interface ExamOut {
+  id: string
+  kind: ExamKind
+  kind_fa: string
+  status: ExamStatus
+  status_fa: string
+  title: string
+  note: string | null
+  resource_id: string | null
+  resource_title: string | null
+  scheduled_date: string | null
+  scheduled_date_jalali: string | null
+  planned_duration_minutes: number | null
+  subjects: string[]
+  planned_topic_ids: string[]
+  actual_topic_ids: string[]
+  session_ids: string[]
+  actual_duration_seconds: number | null
+  duration_fa: string | null
+  started_at: string | null
+  finished_at: string | null
+  scoring: ExamScoring | null
+  created_at: string | null
+}
+
+export interface ExamListOut {
+  items: ExamOut[]
+  upcoming_count: number
+}
+
+export interface ExamSessionRow {
+  id: string
+  label: string | null
+  resource_title: string | null
+  finished?: boolean
+  total_count: number | null
+  correct_count: number | null
+  wrong_count: number | null
+  unanswered_count?: number
+  not_entered_count?: number
+  percent_konkur: number | null
+  percent_no_penalty: number | null
+  actual_duration?: number | null
+}
+
+export interface ExamTopicRow {
+  topic_id: string
+  topic_title: string | null
+  book_title?: string | null
+}
+
+export interface ExamResultBody {
+  scoring: ExamScoring
+  sessions: ExamSessionRow[]
+  actual_topics: ExamTopicRow[]
+  planned_topics: ExamTopicRow[]
+  duration_fa: string | null
+  is_mock: boolean
+}
+
+export interface ExamResultOut extends ExamOut {
+  result: ExamResultBody
+}
+
+/** Today Hub item 5 — آزمون نزدیک (doc 07 §7.6) */
+export interface UpcomingExam {
+  id: string
+  title: string
+  kind: ExamKind
+  kind_fa: string
+  status: ExamStatus
+  status_fa: string
+  scheduled_date: string | null
+  scheduled_date_jalali: string | null
+  days_until: number
+  subjects: string[]
+}
+
+export interface ExamCreateIn {
+  title: string
+  kind?: ExamKind
+  note?: string | null
+  resource_id?: string | null
+  scheduled_date?: string | null
+  planned_duration_minutes?: number | null
+  subjects?: string[]
+  planned_topic_ids?: string[]
+}
+
+export interface ExamUpdateIn {
+  title?: string
+  note?: string | null
+  scheduled_date?: string | null
+  planned_duration_minutes?: number | null
+  subjects?: string[]
+  planned_topic_ids?: string[]
+  status?: ExamStatus
+}
+
+export interface ExamSubmitIn {
+  session_ids?: string[]
+  total_count?: number | null
+  correct_count?: number | null
+  wrong_count?: number | null
+  unanswered_count?: number | null
+  not_entered_count?: number | null
+  actual_duration_minutes?: number | null
+}
+
+// --- Analytics: سه بلوک جدا (V2-A01) ---
+
+export interface CoverageByResource {
+  resource_id: string
+  title: string
+  subject: string | null
+  topics_total: number
+  topics_attempted: number
+  topics_ratio: number | null
+}
+
+export interface CoverageBlock {
+  topics_total: number
+  topics_attempted: number
+  topics_ratio: number | null
+  questions_total: number
+  questions_attempted: number
+  questions_ratio: number | null
+  by_resource: CoverageByResource[]
+}
+
+export interface AccuracyBlock {
+  correct: number
+  wrong: number
+  unanswered: number
+  not_entered: number
+  answered_accuracy: number | null
+  percent_konkur: number | null
+  percent_no_penalty: number | null
+  penalty_k: number | null
+}
+
+export interface VolumeBlock {
+  attempts: number
+  sessions: number
+  study_minutes: number
+  test_duration_minutes: number
+  active_days: number
+  reviews_done: number
+  avg_attempts_per_active_day: number | null
+}
+
+export interface TimeBucketRow {
+  bucket: string
+  attempts: number
+  correct: number
+  wrong: number
+  answered_accuracy: number | null
+}
+
+export interface DailyPoint {
+  date: string
+  date_jalali: string
+  attempts: number
+  correct: number
+  wrong: number
+  study_minutes: number
+  sessions: number
+}
+
+export interface WeaknessRow {
+  topic_id: string | null
+  topic_title: string | null
+  coverage: number | null
+  accuracy: number | null
+  exam_readiness: number | null
+}
+
+/** doc 12.4 — فقط کیفی، هرگز ادعای رتبه دقیق */
+export interface KonkursTargetOut {
+  has_target: boolean
+  target: string | null
+  level_fa: string | null
+  message_fa: string
+  based_on: { answered_accuracy: number | null; topics_ratio: number | null }
+}
+
+export interface OverviewOut {
+  window: { days: number; start: string; end: string; start_jalali: string; end_jalali: string }
+  coverage: CoverageBlock
+  accuracy: AccuracyBlock
+  volume: VolumeBlock
+  time_buckets: TimeBucketRow[]
+  daily: DailyPoint[]
+  weaknesses: WeaknessRow[]
+  konkurs_target: KonkursTargetOut
+}
+
+export interface BySubjectItem {
+  resource_id: string
+  title: string
+  subject: string | null
+  coverage: { topics_total: number; topics_attempted: number; topics_ratio: number | null; questions_total: number; questions_attempted: number }
+  accuracy: { correct: number; wrong: number; answered_accuracy: number | null }
+  volume: { attempts: number; sessions: number; duration_minutes: number }
+}
+
+export interface ByChapterItem {
+  chapter_title: string
+  book_title: string | null
+  coverage: { topics_total: number; topics_attempted: number; topics_ratio: number | null }
+  accuracy: { correct: number; wrong: number; answered_accuracy: number | null }
+  volume: { attempts: number }
+}
+
+export interface ByTopicItem {
+  topic_id: string
+  topic_title: string | null
+  book_title: string | null
+  chapter_title: string | null
+  coverage: { questions_total: number; questions_attempted: number; questions_ratio: number | null }
+  accuracy: { correct: number; wrong: number; answered_accuracy: number | null }
+  volume: { attempts: number; duration_minutes: number }
+  exam_readiness: number | null
+  weakness: boolean
+}
+
+export interface DifficultyItem {
+  difficulty: number | null
+  difficulty_fa: string
+  volume: { attempts: number }
+  accuracy: { correct: number; wrong: number; answered_accuracy: number | null }
+}
+
+export interface MistakesOut {
+  by_error_type: { error_type: string | null; error_type_fa: string; count: number }[]
+  top_wrong_topics: { topic_title: string | null; wrong_count: number }[]
+  repeated_wrong_questions: { topic_title: string | null; book_title: string | null; question_number: number | null; wrong_count: number; critical: boolean }[]
+  notes_total: number
+  notes_unlabeled: number
+}
+
+// --- Reports (doc 12.5) ---
+
+export interface TopTopicRow {
+  topic_id: string | null
+  topic_title: string | null
+  attempts: number
+}
+
+export interface ReportExamRow {
+  id: string
+  title: string
+  kind: ExamKind
+  status: ExamStatus
+  scheduled_date: string | null
+  scheduled_date_jalali: string | null
+  percent_konkur: number | null
+  percent_no_penalty: number | null
+}
+
+export interface DailyReport {
+  kind: 'daily'
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  coverage: CoverageBlock
+  accuracy: AccuracyBlock
+  volume: VolumeBlock
+  plan: { tasks_total: number; tasks_done: number; study_minutes: number }
+  capacity: { available_minutes: number | null; used_minutes: number }
+  reviews_done: number
+  checkin: Record<string, unknown> | null
+  sessions: ExamSessionRow[]
+  exams: ReportExamRow[]
+  top_topics: TopTopicRow[]
+}
+
+export interface WeeklyDayRow {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  is_today: boolean
+  attempts: number
+  correct: number
+  wrong: number
+  study_minutes: number
+  tasks_done: number
+  tasks_total: number
+  reviews_done: number
+  answered_accuracy: number | null
+}
+
+export interface WeeklyReport {
+  kind: 'weekly'
+  week_start: string
+  week_start_jalali: string
+  week_end: string
+  week_end_jalali: string
+  coverage: CoverageBlock
+  accuracy: AccuracyBlock
+  volume: VolumeBlock
+  days: WeeklyDayRow[]
+  capacity: { days_with_snapshot: number; available_minutes: number; used_minutes: number; usage_ratio: number | null }
+  previous_week: { week_start: string; attempts: number; study_minutes: number; attempts_delta: number; study_minutes_delta: number }
+  exams: ReportExamRow[]
+  top_topics: TopTopicRow[]
+  sessions: ExamSessionRow[]
+}
+
+export interface MonthlyWeekRow {
+  week_start: string
+  week_start_jalali: string
+  days: number
+  attempts: number
+  correct: number
+  wrong: number
+  study_minutes: number
+  tasks_done: number
+  tasks_total: number
+  answered_accuracy: number | null
+}
+
+export interface MonthlyReport {
+  kind: 'monthly'
+  month: string
+  start: string
+  end: string
+  start_jalali: string
+  end_jalali: string
+  coverage: CoverageBlock
+  accuracy: AccuracyBlock
+  volume: VolumeBlock
+  weeks: MonthlyWeekRow[]
+  exams: ReportExamRow[]
+  top_topics: TopTopicRow[]
+}
+
+// --- Export (V2-A02: books + attempts همیشه داخل JSON کامل) ---
+
+export interface ExportJsonOut {
+  app: string
+  version: string
+  exported_at: string
+  exported_at_jalali: string
+  profile: Record<string, unknown>
+  settings: Record<string, unknown>
+  books: unknown[]
+  test_sessions: unknown[]
+  attempts: unknown[]
+  error_notes: unknown[]
+  question_marks: unknown[]
+  review_items: unknown[]
+  learning_states: unknown[]
+  goals: unknown[]
+  exams: unknown[]
+  plan_tasks: unknown[]
+  time_blocks: unknown[]
+  capacity_snapshots: unknown[]
+  recommendations: unknown[]
+  checkins: unknown[]
+}
+
+export type PdfReportKind = 'daily' | 'weekly' | 'monthly' | 'summary'
