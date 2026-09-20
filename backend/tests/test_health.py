@@ -22,7 +22,7 @@ def test_health_data(client):
     assert data["schema_version"] == "2.0.0"
     assert data["db"]["type"] == "sqlite"
     # version management recorded via alembic + app_metadata
-    assert data["alembic_revision"] == "0005_review_learning"
+    assert data["alembic_revision"] == "0006_planning"
     assert data["timezone"] == "Asia/Tehran"
     assert data["week_start"] == "saturday"
     # Jalali today (doc 03 §3.5) — 2026-09-20 in Tehran is 1405/06/29

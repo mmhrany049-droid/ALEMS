@@ -15,7 +15,7 @@
 | 2 | Books TOC-only (import فهرست، tree، block_type) | ✅ انجام شد |
 | 3 | Test Engine (session، range/parity، past import) | ✅ انجام شد |
 | 4 | Review & Learning (صف، spaced، cluster، learning state) | ✅ انجام شد |
-| 5 | Planning & Today (capacity، generate-week، override) | ⬜ |
+| 5 | Planning & Today (capacity، generate-week، override) | ✅ انجام شد |
 | 6 | Exam & Analytics (exam center، متریک‌ها، export) | ⬜ |
 | 7 | Rewards & Recommendation (streak، پیشنهاد، explain) | ⬜ |
 | 8 | Polish & Hardening (focus mode، backup، AT کامل) | ⬜ |
@@ -172,6 +172,23 @@ cd frontend && npm run build               # type-check + build
 - [x] Frontend: صفحه مرور با **stagger animation** صف (doc 07.4 #2)، کارت‌های cluster و وضعیت یادگیری با بارهای پیشرفت؛ toggle تیک‌ها در SessionRunner؛ کارت تنظیمات مرور/جریمه در Settings
 - [x] Migration Alembic 0005 (question_marks/review_queue/learning_states + ایندکس‌های حیاتی doc 05)
 - [x] 107/107 pytest سبز · vite build سبز · آزمون زنده ۲۹/۲۹ روی سرور واقعی
+
+## معیار پذیرش فاز ۵ (خود-بررسی)
+
+- [x] **time blocks مدرسه/کلاس/وقت آزاد** — `GET/PUT /time-blocks` (ورودی «HH:MM» یا دقیقه)؛ بلوک‌ها ورودی ظرفیت‌اند (doc 11.2)
+- [x] **school override** ظرفیت را عوض می‌کند (V2-P02): `POST /school-override` با بلوک مدرسه یا `school_off`؛ capacity.source=override
+- [x] **capacity محاسبه‌شده** (doc 11.2): بلوک‌های روز + override + میانگین انجام ۷ روز اخیر + state factor وزن‌پایین (check-in) → `available_minutes` / `suggested_task_count` / `suggested_session_count` (وعده ۶۰–۱۲۰ دقیقه) — «وقت آزاد ≠ ظرفیت»
+- [x] **generate-week با pipeline دوازده‌مرحله‌ای ثابت و لاگ‌شده** (doc 11.3): load_context → exams → goals → taught_filter → learning_states → review_demand → priority_items → capacity_per_day → allocate_tasks → overload_check → explain → save_suggested؛ خروجی **پیشنهاد است نه قطعی** (locked=false، §8.7)
+- [x] **manual override کامل** (doc 11.4): افزودن/حذف (PUT روز)، جابه‌جایی (move-task با تاریخ شمسی/میلادی)، split، merge هم‌روز، status (done/skipped/pending)، **lock** — ویرایش دستی همیشه برنده است
+- [x] **کار قفل‌شده بعد از regenerate می‌ماند** (V2-P03): فقط `source=generated ∧ locked=false` حذف می‌شود؛ `kept_locked` در پاسخ گزارش می‌شود
+- [x] **recovery بدون dump روی فردا** (V2-P04، doc 11.5): بحرانی‌ها (review/weakness) زودتر، بقیه با سقف `ceil(n/روزهای باقی‌مانده)` پخش می‌شوند؛ `tomorrow_share` در پاسخ — هرگز ۱۰۰٪ روی فردا
+- [x] **GET /today کامل** (V2-P01، doc 07.6 ≥۵ بخش): greeting + check-in + ظرفیت + کارهای امروز + مرور سررسیده + پیشنهاد روز + sparkline هفت روز + نوار هفته (+ upcoming_exams فاز ۶)
+- [x] **recommendation = یک اقدام مشخص امروز** با accept/reject (doc 11.6) و **≥۱ دلیل با کد قابل ترجمه فارسی** (§8.10 — reasons: [{code, fa}])
+- [x] **priority هفته** (doc 11.6): `GET /priority/week` از PrioritySnapshot (upsert هر generate)؛ هدف CRUD با تاریخ شمسی
+- [x] Frontend: **Today Hub با داده واقعی + motion cascade** (todayCascade/todayBlock — doc 07.4 #5)، صفحه برنامه با نوار هفته، انیمیشن ۱۲ مرحله planner (plannerStep #8)، ویرایشگر بلوک زمانی، lock/split/merge/move/status، نتیجه recovery
+- [x] تاریخ شمسی در URL و body (`/plans/1405-06-29` ≡ `/plans/2026-09-20`)؛ پیام‌های خطا فارسی
+- [x] Migration Alembic 0006 (goals/time_blocks/capacity_snapshots/plan_tasks/plan_runs/priority_snapshots/recommendations)
+- [x] 126/126 pytest سبز · vite build سبز · آزمون زنده ۶۷/۶۷ روی سرور واقعی
 
 ## قواعد کلیدی (غیرقابل مذاکره)
 

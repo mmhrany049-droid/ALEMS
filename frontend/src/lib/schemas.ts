@@ -353,3 +353,240 @@ export interface LearningStateOut {
 export interface LearningStatesOut {
   items: LearningStateOut[]
 }
+
+// --- Phase 5 — Planning & Capacity & Today Hub (doc 11، doc 07.6، doc 06) -------
+
+export type PlanTaskKind = 'study' | 'test' | 'review' | 'goal'
+export type PlanTaskSource = 'generated' | 'manual' | 'recovered'
+export type PlanTaskStatus = 'pending' | 'done' | 'skipped'
+export type TimeBlockKind = 'school' | 'class' | 'free'
+export type GoalKind = 'long' | 'month' | 'week'
+
+export interface GoalOut {
+  id: string
+  title: string
+  kind: GoalKind
+  target_date: string | null
+  target_date_jalali: string | null
+  created_at: string | null
+}
+
+export interface GoalsOut {
+  items: GoalOut[]
+}
+
+export interface CapacityOut {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  school_minutes: number
+  class_minutes: number
+  free_minutes: number
+  has_blocks: boolean
+  available_minutes: number
+  suggested_task_count: number
+  suggested_session_count: number
+  completion_rate: number
+  state_factor: number
+  source: 'computed' | 'override'
+}
+
+export interface TimeBlockOut {
+  id: string
+  date: string
+  kind: TimeBlockKind
+  start: string
+  end: string
+  start_minutes: number
+  end_minutes: number
+  minutes: number
+  title: string | null
+  source: string
+}
+
+export interface TimeBlocksOut {
+  date: string
+  date_jalali: string
+  blocks: TimeBlockOut[]
+  capacity: CapacityOut
+}
+
+export interface PlanTaskOut {
+  id: string
+  date: string
+  date_jalali: string
+  kind: PlanTaskKind
+  kind_fa: string
+  title: string
+  topic_id: string | null
+  topic_title: string | null
+  book_title: string | null
+  minutes: number
+  count: number | null
+  status: PlanTaskStatus
+  locked: boolean
+  source: PlanTaskSource
+  source_fa: string
+  reason_code: string | null
+  reason_fa: string | null
+  order_index: number
+}
+
+export interface PlanDayCounts {
+  total: number
+  done: number
+  locked: number
+  minutes: number
+}
+
+export interface PlanDayOut {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  capacity: CapacityOut
+  tasks: PlanTaskOut[]
+  counts: PlanDayCounts
+}
+
+export interface WeekDaySummary {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  available_minutes: number
+  suggested_task_count: number
+  capacity_source: 'computed' | 'override'
+  tasks_count: number
+  minutes: number
+}
+
+export interface PipelineStep {
+  step: string
+  ms: number
+  info: Record<string, unknown>
+}
+
+export interface PriorityItem {
+  topic_id: string
+  topic_title: string
+  book_title: string | null
+  score: number
+  reason_codes: string[]
+  review_due: number
+  exam_readiness: number
+  weakness: boolean
+}
+
+export interface GenerateWeekOut {
+  week_start: string
+  week_start_jalali: string
+  days: WeekDaySummary[]
+  created: number
+  removed: number
+  kept_locked: number
+  priority: PriorityItem[]
+  steps: PipelineStep[]
+  run_id: string
+  total_ms: number
+}
+
+export interface PriorityWeekOut {
+  week_start: string
+  week_start_jalali: string
+  items: PriorityItem[]
+  from_snapshot: boolean
+  message: string | null
+}
+
+export interface RecoveryOut {
+  moved: number
+  days: Record<string, number>
+  cap_per_day: number
+  week_start: string
+  tomorrow_share: number
+}
+
+export interface RecReason {
+  code: string
+  fa: string
+}
+
+export interface RecommendationPayload {
+  kind: 'task' | 'review' | 'study' | 'none'
+  title: string
+  minutes?: number | null
+  task_id?: string | null
+  review_item_id?: string | null
+  topic_id?: string | null
+}
+
+export interface RecommendationOut {
+  id: string
+  date: string
+  date_jalali: string
+  status: 'suggested' | 'accepted' | 'rejected' | 'edited'
+  payload: RecommendationPayload
+  reasons: RecReason[]
+}
+
+export interface SparklineDay {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  done_minutes: number
+  done_tasks: number
+  planned_tasks: number
+  attempts: number
+  is_today: boolean
+}
+
+export interface TodayWeekDay {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  is_today: boolean
+  tasks_count: number
+  done_count: number
+  locked_count: number
+}
+
+export interface TodayOut {
+  date: string
+  date_jalali: string
+  weekday_fa: string
+  greeting: string
+  checkin: StateOut
+  capacity: CapacityOut
+  plan_items: PlanTaskOut[]
+  plan_counts: { total: number; done: number; locked: number }
+  review_top: ReviewItemOut[]
+  review_due_count: number
+  upcoming_exams: unknown[]
+  recommendation: RecommendationOut | null
+  week_sparkline: SparklineDay[]
+  week: { week_start: string; week_start_jalali: string; days: TodayWeekDay[] }
+}
+
+export interface SplitOut {
+  parts: number
+  tasks: PlanTaskOut[]
+}
+
+/** ورودی PUT /plans/{date} — لیست جایگزین کل کارهای روز می‌شود (doc 11.4). */
+export interface PlanTaskIn {
+  id?: string
+  title?: string
+  kind?: PlanTaskKind
+  minutes?: number
+  count?: number
+  status?: PlanTaskStatus
+  locked?: boolean
+  topic_id?: string
+  reason_code?: string
+}
+
+export interface TimeBlockIn {
+  kind: TimeBlockKind
+  start: string | number
+  end: string | number
+  title?: string
+}
