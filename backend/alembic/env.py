@@ -31,7 +31,10 @@ import app.modules.backup.models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False حیاتی است: fileConfig پیش‌فرض لاگرهای موجود
+    # (uvicorn.*, alems) را غیرفعال می‌کند → بعد از migration هیچ خطا/پیروزی
+    # چاپ نمی‌شد (startup ناموفق کاملاً بی‌صدا می‌مرد).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)

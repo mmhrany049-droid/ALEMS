@@ -38,11 +38,17 @@ logger = logging.getLogger("alems")
 
 
 def _setup_logging() -> None:
-    """فارسی-دوست logging: UTF-8, one clear line per record."""
+    """فارسی-دوست logging: UTF-8, one clear line per record.
+
+    force=True چون alembic در fileConfig حین migration ریشه را به WARN/هندلر
+    خودش بازنشانی می‌کند؛ بعد از migration دوباره این را صدا می‌زنیم تا
+    پیکربندی اپ (INFO + فرمت خوانا) برگردد و پیام‌های راه‌اندازی دیده شوند.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)-5s | %(name)s | %(message)s",
         datefmt="%H:%M:%S",
+        force=True,
     )
 
 
@@ -57,9 +63,25 @@ def _run_migrations() -> None:
     from alembic import command
     from alembic.config import Config
 
+    logger.info("migrationهای Alembic در حال اجرا…")
     cfg = Config(str(BACKEND_ROOT / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    command.upgrade(cfg, "head")
+    try:
+        command.upgrade(cfg, "head")
+    except Exception:
+        # خطا قورت داده نمی‌شود — فقط پیام روشن فارسی اضافه و دوباره raise می‌شود
+        # تا uvicorn آن را با traceback کامل چاپ کند (NFR-5).
+        logger.exception(
+            "migration ناموفق بود — دیتابیس در %s قابل ساخت/به‌روزرسانی نیست. "
+            "اگر روی ویندوز هستید: قفل بودن فایل توسط پروسه دیگر/آنتی‌ویروس/OneDrive "
+            "و نبود پوشه data را بررسی کنید.",
+            get_settings().database_url,
+        )
+        raise
+    finally:
+        # alembic حین upgrade ریشه logging را بازنشانی می‌کند → پیکربندی اپ برگردد
+        _setup_logging()
+    logger.info("schema آماده است — alembic head اعمال شد.")
 
 
 @asynccontextmanager
